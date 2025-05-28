@@ -1,132 +1,133 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
-#define MAX_STAGES 8
+#define MAX_MENU_LEN 30
+#define TRAINING_COUNT 8
+#define MAIN_MENU_COUNT 3
 
-char stages[MAX_STAGES] = {'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N'};
+// Training stage result states: ' ' = not attempted, 'P' = passed, 'F' = failed
+char trainingResults[TRAINING_COUNT] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
 
-void displayMainMenu();
-void displayTrainingMenu();
-void handleAuditionManagement();
-void handleTraining();
-void handleDebut();
-void stageEvaluation(int stage);
-int checkTrainingCompletion();
+const char mainMenu[MAIN_MENU_COUNT][MAX_MENU_LEN] = {
+    "I. Audition Management",
+    "II. Training",
+    "III. Debut"
+};
 
-int main() {
-    char choice;
+const char trainingMenu[TRAINING_COUNT][MAX_MENU_LEN] = {
+    "1. Physical Strength & Knowledge",
+    "2. Self-Management & Teamwork",
+    "3. Language & Pronunciation",
+    "4. Vocal",
+    "5. Dance",
+    "6. Visual & Image",
+    "7. Acting & Stage Performance",
+    "8. Fan Communication"
+};
 
-    while (1) {
-        displayMainMenu();
-        printf("Enter your choice (0, Q to quit): ");
-        choice = getchar();
-        getchar();  
-
-        if (choice == '0' || choice == 'Q' || choice == 'q') {
-            break;
-        }
-
-        switch (choice) {
-            case '1':
-                handleAuditionManagement();
-                break;
-            case '2':
-                handleTraining();
-                break;
-            case '3':
-                handleDebut();
-                break;
-            default:
-                printf("Invalid choice! Please try again.\n");
-        }
-    }
-
-    return 0;
+void clearInput() {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
 }
 
 void displayMainMenu() {
-    printf("\n=== Main Menu ===\n");
-    printf("1. Audition Management\n");
-    printf("2. Training\n");
-    printf("3. Debut\n");
-    printf("0. Exit\n");
-    printf("Q. Quit\n");
-}
-
-void handleAuditionManagement() {
-    printf("\nYou selected Audition Management.\n");
-}
-
-void handleTraining() {
-    char choice;
-
-    while (1) {
-        displayTrainingMenu();
-        printf("Enter your choice (0 to go back): ");
-        choice = getchar();
-        getchar();  
-
-        if (choice == '0') {
-            break;
-        }
-
-        int stage = choice - '1'; 
-
-        if (stage < 0 || stage >= MAX_STAGES) {
-            printf("Invalid choice! Please select a valid stage.\n");
-        } else if (stages[stage] == 'P') {
-            printf("Stage %d has already been passed.\n", stage + 1);
-        } else if (stage == 0 || stage == 1) {
-            stageEvaluation(stage);  
-        } else if (checkTrainingCompletion() >= 2) {
-            stageEvaluation(stage);
-        } else {
-            printf("Stages 1 and 2 must be completed before selecting other stages.\n");
-        }
+    printf("\n========= Main Menu =========\n");
+    for (int i = 0; i < MAIN_MENU_COUNT; ++i) {
+        printf("%d. %s\n", i + 1, mainMenu[i]);
     }
+    printf("0 / Q / q to exit\n");
+    printf("=============================\n");
 }
 
 void displayTrainingMenu() {
-    printf("\n=== Training Menu ===\n");
-    printf("1. Physical Strength & Knowledge\n");
-    printf("2. Self-Management & Teamwork\n");
-    printf("3. Language & Pronunciation\n");
-    printf("4. Vocal\n");
-    printf("5. Dance\n");
-    printf("6. Visual & Image\n");
-    printf("7. Acting & Stage Performance\n");
-    printf("8. Fan Communication\n");
-    printf("0. Go Back\n");
+    printf("\n===== Training Stage Menu =====\n");
+    for (int i = 0; i < TRAINING_COUNT; ++i) {
+        printf("%d. %s [%c]\n", i + 1, trainingMenu[i], trainingResults[i]);
+    }
+    printf("0 / Q / q to go back\n");
+    printf("===============================\n");
 }
 
-void handleDebut() {
-    printf("\nYou selected Debut.\n");
-}
+void evaluateStage(int stageIndex) {
+    char response;
+    printf("Would you like to enter the evaluation result? (Y/N): ");
+    scanf(" %c", &response);
+    response = toupper(response);
+    clearInput();
 
-void stageEvaluation(int stage) {
-    char result;
-    printf("\nWould you like to enter the evaluation result? (Y/N): ");
-    scanf(" %c", &result);
-    if (result == 'Y' || result == 'y') {
+    if (response == 'Y') {
+        if (trainingResults[stageIndex] != ' ') {
+            printf("This stage has already been evaluated.\n");
+            return;
+        }
+
+        // Enforce stage 1 and 2 sequencing
+        if ((stageIndex == 1 && trainingResults[0] != 'P') ||
+            (stageIndex > 1 && (trainingResults[0] != 'P' || trainingResults[1] != 'P'))) {
+            printf("You must pass required earlier stage(s) first.\n");
+            return;
+        }
+
         printf("Did you complete the training and pass the certification? (P/F): ");
+        char result;
         scanf(" %c", &result);
-        if (result == 'P' || result == 'p') {
-            stages[stage] = 'P';
-            printf("Stage %d passed.\n", stage + 1);
+        result = toupper(result);
+        clearInput();
+
+        if (result == 'P' || result == 'F') {
+            trainingResults[stageIndex] = result;
+            printf("Result recorded as '%c'.\n", result);
         } else {
-            stages[stage] = 'F';
-            printf("Stage %d failed.\n", stage + 1);
+            printf("Invalid input. Use 'P' or 'F'.\n");
         }
     }
 }
 
-int checkTrainingCompletion() {
-    int completed = 0;
-    for (int i = 0; i < MAX_STAGES; i++) {
-        if (stages[i] == 'P') {
-            completed++;
+void handleTrainingMenu() {
+    char input[10];
+    while (1) {
+        displayTrainingMenu();
+        printf("Select a training stage: ");
+        fgets(input, sizeof(input), stdin);
+        if (input[0] == '0' || toupper(input[0]) == 'Q') break;
+
+        int option = atoi(input);
+        if (option >= 1 && option <= TRAINING_COUNT) {
+            evaluateStage(option - 1);
+        } else {
+            printf("Invalid stage. Choose between 1 and %d.\n", TRAINING_COUNT);
         }
     }
-    return completed;
+}
+
+void handleMainMenu() {
+    char input[10];
+    while (1) {
+        displayMainMenu();
+        printf("Select a menu: ");
+        fgets(input, sizeof(input), stdin);
+        if (input[0] == '0' || toupper(input[0]) == 'Q') break;
+
+        int option = atoi(input);
+        switch (option) {
+            case 1:
+                printf("Audition Management - (functionality not implemented).\n");
+                break;
+            case 2:
+                handleTrainingMenu();
+                break;
+            case 3:
+                printf("Debut - (functionality not implemented).\n");
+                break;
+            default:
+                printf("Invalid menu. Please select 1 to 3.\n");
+        }
+    }
+}
+
+int main() {
+    handleMainMenu();
+    printf("Program exited.\n");
+    return 0;
 }
