@@ -2,293 +2,386 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
-#define MAX_TITLE_LEN 50
-#define MAX_DATE_LEN 11
-#define MAX_FIELD_LEN 30
-#define MAX_QUAL_LEN 100
-#define MAX_SOCIAL_NAME 20
-#define MAX_API_KEY 40
-#define MAX_API_URL 100
+#define MAX_DANCES 6
+#define MAX_STEPS 10
+#define MAX_MEMBERS 10
+#define MAX_STEP_LEN 30
+#define MAX_PATTERNS 6
+#define MAX_DESC_LEN 300
+#define MAX_SONGS 4
+#define MAX_NAME_LEN 50
 
-typedef struct Qualification {
-    char *qualification;
-    struct Qualification *next;
-} Qualification;
+// Structs
+typedef struct {
+    char nameKR[50];
+    char nameEN[50];
+    char steps[MAX_STEPS][MAX_STEP_LEN];
+    int stepCount;
+} Dance;
 
-typedef struct JobDetail {
-    int hires;
-    char field[MAX_FIELD_LEN];
-    Qualification *qualifications;
-} JobDetail;
+typedef struct {
+    char name[50];
+    char nickname[50];
+    int score;
+} Member;
 
-typedef struct JobPost {
-    int id;
-    char title[MAX_TITLE_LEN];
-    char posting_date[MAX_DATE_LEN];
-    char deadline[MAX_DATE_LEN];
-    JobDetail detail;
-    struct JobPost *next;
-} JobPost;
+typedef struct {
+    char name[MAX_NAME_LEN];
+    char description[MAX_DESC_LEN];
+} Pattern;
 
-typedef struct SocialNetwork {
-    char name[MAX_SOCIAL_NAME];
-    char api_key[MAX_API_KEY];
-    char api_url[MAX_API_URL];
-    struct SocialNetwork *next;
-} SocialNetwork;
+typedef struct TreeNode {
+    char patternName[MAX_NAME_LEN];
+    struct TreeNode* next;
+} TreeNode;
 
-JobPost *job_list = NULL;
-JobPost *expired_job_list = NULL;
-SocialNetwork *social_list = NULL;
-int job_id_counter = 1;
+typedef struct {
+    char songName[MAX_NAME_LEN];
+    TreeNode* head;
+} ChoreoSong;
 
-void free_qualifications(Qualification *head) {
-    while (head) {
-        Qualification *tmp = head;
-        head = head->next;
-        free(tmp);
+// Globals
+Dance dances[MAX_DANCES];
+Member members[MAX_MEMBERS] = {
+    {"Arthur", "arth", 0},
+    {"Yongjin", "yj", 0},
+    {"Sejin", "sj", 0},
+    {"Nahid", "nh", 0},
+    {"Vinh", "vn", 0}
+};
+int memberCount = 5;
+Pattern patterns[MAX_PATTERNS];
+ChoreoSong songs[MAX_SONGS];
+
+// ===== Problem 1: Learn Basic Dance Steps =====
+
+void shuffle(char array[][MAX_STEP_LEN], int n) {
+    for (int i = n - 1; i > 0; i--) {
+        int j = rand() % (i + 1);
+        char temp[MAX_STEP_LEN];
+        strcpy(temp, array[i]);
+        strcpy(array[i], array[j]);
+        strcpy(array[j], temp);
     }
 }
 
-void free_jobs(JobPost *head) {
-    while (head) {
-        free_qualifications(head->detail.qualifications);
-        JobPost *tmp = head;
-        head = head->next;
-        free(tmp);
+int readDanceSteps(const char* filename) {
+    FILE* fp = fopen(filename, "r");
+    if (!fp) {
+        printf("Error: Cannot open %s\n", filename);
+        return 0;
+    }
+    int count = 0;
+    while (fscanf(fp, "%[^,],%[^,],", dances[count].nameKR, dances[count].nameEN) == 2) {
+        char stepLine[200];
+        fgets(stepLine, sizeof(stepLine), fp);
+        stepLine[strcspn(stepLine, "\n")] = 0;
+
+        char* token = strtok(stepLine, " ");
+        int sCount = 0;
+        while (token && sCount < MAX_STEPS) {
+            strcpy(dances[count].steps[sCount++], token);
+            token = strtok(NULL, " ");
+        }
+        dances[count].stepCount = sCount;
+        count++;
+        if (count >= MAX_DANCES) break;
+    }
+    fclose(fp);
+    return count;
+}
+
+int findMemberIndex(char* nickname) {
+    for (int i = 0; i < memberCount; i++) {
+        if (strcmp(members[i].nickname, nickname) == 0) return i;
+    }
+    return -1;
+}
+
+int evaluate(char correct[][MAX_STEP_LEN], char input[][MAX_STEP_LEN], int count) {
+    int correctCount = 0, inOrder = 1;
+    for (int i = 0; i < count; i++) {
+        int match = 0;
+        for (int j = 0; j < count; j++) {
+            if (strcmp(input[i], correct[j]) == 0) {
+                match = 1;
+                if (i != j) inOrder = 0;
+                break;
+            }
+        }
+        if (match) correctCount++;
+    }
+    if (correctCount == count && inOrder) return 100;
+    else if (correctCount == count) return 50;
+    else if (correctCount >= 1) return 20;
+    return 0;
+}
+
+void learnDanceStep() {
+    char nickname[50];
+    int attempt = 0, index = -1;
+
+    while (attempt < 3) {
+        printf("Enter your nickname: ");
+        scanf("%s", nickname);
+        index = findMemberIndex(nickname);
+        if (index != -1) break;
+        printf("Nickname not found. Try again.\n");
+        attempt++;
+    }
+    if (index == -1) {
+        printf("Failed 3 times. Returning to menu.\n");
+        return;
+    }
+
+    if (!readDanceSteps("dance_step.txt")) return;
+
+    srand(time(NULL));
+    int d = rand() % MAX_DANCES;
+    Dance selected = dances[d];
+
+    printf("\nDance: %s (%s)\nSteps: ", selected.nameKR, selected.nameEN);
+    for (int i = 0; i < selected.stepCount; i++) {
+        printf("%s ", selected.steps[i]);
+    }
+    printf("\nMemorize in 10 seconds...\n");
+    sleep(10);
+    system("clear");
+
+    char shuffled[MAX_STEPS][MAX_STEP_LEN];
+    for (int i = 0; i < selected.stepCount; i++)
+        strcpy(shuffled[i], selected.steps[i]);
+    shuffle(shuffled, selected.stepCount);
+
+    printf("Dance: %s (%s)\n", selected.nameKR, selected.nameEN);
+    printf("Shuffled Steps:\n");
+    for (int i = 0; i < selected.stepCount; i++)
+        printf("%d. %s\n", i + 1, shuffled[i]);
+
+    char inputSteps[MAX_STEPS][MAX_STEP_LEN];
+    printf("\nEnter the steps in order:\n");
+    for (int i = 0; i < selected.stepCount; i++) {
+        printf("Step %d: ", i + 1);
+        scanf("%s", inputSteps[i]);
+    }
+
+    int score = evaluate(selected.steps, inputSteps, selected.stepCount);
+    members[index].score = score;
+
+    printf("\nCorrect Steps: ");
+    for (int i = 0; i < selected.stepCount; i++)
+        printf("%s ", selected.steps[i]);
+
+    printf("\nYour Input: ");
+    for (int i = 0; i < selected.stepCount; i++)
+        printf("%s ", inputSteps[i]);
+
+    printf("\nYour Score: %d\n", score);
+}
+
+// ===== Problem 2: Learn Choreography Patterns =====
+
+int loadPatterns(const char* filename) {
+    FILE* fp = fopen(filename, "r");
+    if (!fp) {
+        printf("Cannot open %s\n", filename);
+        return 0;
+    }
+    int i = 0;
+    while (fscanf(fp, "%[^,],%[^\n]\n", patterns[i].name, patterns[i].description) == 2 && i < MAX_PATTERNS) {
+        i++;
+    }
+    fclose(fp);
+    return i;
+}
+
+void getRandomClue(char* description, char* clue) {
+    int len = strlen(description);
+    char temp[MAX_DESC_LEN] = "";
+    for (int i = 0; i < len; i++) {
+        if (description[i] != ' ') {
+            int l = strlen(temp);
+            temp[l] = description[i];
+            temp[l + 1] = '\0';
+        }
+    }
+    len = strlen(temp);
+    if (len <= 10) {
+        strcpy(clue, temp);
+    } else {
+        int start = rand() % (len - 10);
+        strncpy(clue, &temp[start], 10);
+        clue[10] = '\0';
     }
 }
 
-void free_socials(SocialNetwork *head) {
-    while (head) {
-        SocialNetwork *tmp = head;
-        head = head->next;
-        free(tmp);
+int loadChoreoCSV(const char* filename) {
+    FILE* fp = fopen(filename, "r");
+    if (!fp) return 0;
+    int count = 0;
+    char line[500];
+    while (fgets(line, sizeof(line), fp) && count < MAX_SONGS) {
+        line[strcspn(line, "\n")] = 0;
+        char* token = strtok(line, ",");
+        strcpy(songs[count].songName, token);
+        TreeNode* head = NULL;
+        TreeNode* tail = NULL;
+        while ((token = strtok(NULL, ",")) != NULL) {
+            TreeNode* newNode = malloc(sizeof(TreeNode));
+            strcpy(newNode->patternName, token);
+            newNode->next = NULL;
+            if (!head) head = tail = newNode;
+            else {
+                tail->next = newNode;
+                tail = newNode;
+            }
+        }
+        songs[count].head = head;
+        count++;
+    }
+    fclose(fp);
+    return count;
+}
+
+void displayAllTrees(int songCount) {
+    for (int i = 0; i < songCount; i++) {
+        printf("\n[%d] %s: ", i + 1, songs[i].songName);
+        TreeNode* curr = songs[i].head;
+        while (curr) {
+            printf("%s -> ", curr->patternName);
+            curr = curr->next;
+        }
+        printf("END\n");
     }
 }
 
-int date_compare(const char *d1, const char *d2) {
-    return strcmp(d1, d2);
+void playPatternGame(ChoreoSong song) {
+    TreeNode* curr = song.head;
+    printf("\nLet's play the choreography pattern game for [%s]!\n", song.songName);
+    printf("First Pattern: %s\n", curr->patternName);
+    curr = curr->next;
+
+    while (curr) {
+        char input[MAX_NAME_LEN];
+        printf("Next Pattern? ");
+        scanf("%s", input);
+        if (strcmp(input, curr->patternName) != 0) {
+            printf("Wrong! Returning to menu.\n");
+            return;
+        }
+        printf("Correct!\n");
+        curr = curr->next;
+    }
+
+    printf("\n🎉 You completed all patterns for %s! Well done!\n", song.songName);
 }
 
-void move_expired_jobs(const char *current_date) {
-    JobPost **cur = &job_list;
-    while (*cur) {
-        if (date_compare((*cur)->deadline, current_date) < 0) {
-            JobPost *expired = *cur;
-            *cur = expired->next;
-            expired->next = expired_job_list;
-            expired_job_list = expired;
+void learnDancePattern() {
+    srand(time(NULL));
+
+    int patternCount = loadPatterns("dance_pattern.txt");
+    if (patternCount == 0) return;
+
+    int correct = 0;
+    for (int i = 0; i < 4; i++) {
+        int idx = rand() % patternCount;
+        char clue[20];
+        getRandomClue(patterns[idx].description, clue);
+
+        printf("\nPattern Description: %s\n", patterns[idx].description);
+        printf("Clue: %s\n", clue);
+
+        char answer[50];
+        printf("Pattern Name: ");
+        scanf(" %[^\n]", answer);
+
+        if (strcmp(answer, patterns[idx].name) == 0) {
+            printf("Correct!\n");
+            correct++;
         } else {
-            cur = &(*cur)->next;
+            printf("Wrong! Correct was: %s\n", patterns[idx].name);
         }
     }
-}
 
-Qualification *input_qualifications() {
-    Qualification *head = NULL, *tail = NULL;
-    int n;
-    printf("Enter number of qualifications: ");
-    scanf("%d", &n);
-    getchar();
-    for (int i = 0; i < n; i++) {
-        char buffer[MAX_QUAL_LEN];
-        printf("Qualification %d: ", i + 1);
-        fgets(buffer, sizeof(buffer), stdin);
-        buffer[strcspn(buffer, "\n")] = 0;
-        Qualification *new_qual = malloc(sizeof(Qualification));
-        new_qual->qualification = malloc(strlen(buffer) + 1);
-        strcpy(new_qual->qualification, buffer);
-        new_qual->next = NULL;
-        if (!head) head = tail = new_qual;
-        else {
-            tail->next = new_qual;
-            tail = new_qual;
-        }
-    }
-    return head;
-}
-
-void print_qualifications(Qualification *head) {
-    int i = 1;
-    while (head) {
-        printf("  %d. %s\n", i++, head->qualification);
-        head = head->next;
-    }
-}
-
-void create_job_posting() {
-    JobPost *new_post = malloc(sizeof(JobPost));
-    new_post->id = job_id_counter++;
-    printf("Enter Job Title (max %d chars): ", MAX_TITLE_LEN - 1);
-    fgets(new_post->title, MAX_TITLE_LEN, stdin);
-    new_post->title[strcspn(new_post->title, "\n")] = 0;
-    printf("Enter Posting Date (YYYY-MM-DD): ");
-    fgets(new_post->posting_date, MAX_DATE_LEN, stdin);
-    new_post->posting_date[strcspn(new_post->posting_date, "\n")] = 0;
-    printf("Enter Deadline (YYYY-MM-DD): ");
-    fgets(new_post->deadline, MAX_DATE_LEN, stdin);
-    new_post->deadline[strcspn(new_post->deadline, "\n")] = 0;
-    printf("Enter Number of Hires: ");
-    scanf("%d", &new_post->detail.hires);
-    getchar();
-    printf("Enter Job Field (max %d chars): ", MAX_FIELD_LEN - 1);
-    fgets(new_post->detail.field, MAX_FIELD_LEN, stdin);
-    new_post->detail.field[strcspn(new_post->detail.field, "\n")] = 0;
-    new_post->detail.qualifications = input_qualifications();
-    new_post->next = job_list;
-    job_list = new_post;
-    printf("Job posting created with ID %d.\n", new_post->id);
-}
-
-void view_job_postings(JobPost *list, int show_expired) {
-    if (!list) {
-        if (!show_expired) {
-            printf("No active job postings found. Redirecting to create job posting...\n");
-            create_job_posting();
-        } else {
-            printf("No expired job postings found.\n");
-        }
+    if (correct < 3) {
+        printf("\nLess than 3 correct. Returning to menu.\n");
         return;
     }
-    printf("%s Job Postings:\n", show_expired ? "Expired" : "Active");
-    JobPost *cur = list;
-    while (cur) {
-        printf("ID: %d | Title: %s | Posting Date: %s | Deadline: %s\n",
-               cur->id, cur->title, cur->posting_date, cur->deadline);
-        cur = cur->next;
-    }
-    printf("Enter job ID to see details or 0 to return: ");
-    int id;
-    scanf("%d", &id);
-    getchar();
-    if (id == 0) return;
-    cur = list;
-    while (cur && cur->id != id) cur = cur->next;
-    if (!cur) {
-        printf("Job ID not found.\n");
-        return;
-    }
-    printf("Job Details for ID %d:\n", cur->id);
-    printf("Title: %s\n", cur->title);
-    printf("Posting Date: %s\n", cur->posting_date);
-    printf("Deadline: %s\n", cur->deadline);
-    printf("Number of Hires: %d\n", cur->detail.hires);
-    printf("Job Field: %s\n", cur->detail.field);
-    printf("Qualifications:\n");
-    print_qualifications(cur->detail.qualifications);
-}
 
-void post_on_social_networks() {
-    if (!social_list) {
-        printf("No social networks registered.\n");
+    int songCount = loadChoreoCSV("analyz_dance-pattern.csv");
+    if (songCount == 0) {
+        printf("Failed to load choreography analysis.\n");
         return;
     }
-    printf("Select Social Network:\n");
-    SocialNetwork *cur = social_list;
-    int idx = 1;
-    while (cur) {
-        printf("%d. %s\n", idx++, cur->name);
-        cur = cur->next;
-    }
+
+    displayAllTrees(songCount);
+    sleep(3);
+    system("clear");
+
+    printf("\nSelect a song to test (1-%d), or 0 to skip: ", songCount);
     int choice;
     scanf("%d", &choice);
-    getchar();
-    if (choice <= 0) return;
-    cur = social_list;
-    for (int i = 1; i < choice && cur; i++) cur = cur->next;
-    if (!cur) {
-        printf("Invalid social network selection.\n");
-        return;
+    if (choice >= 1 && choice <= songCount) {
+        playPatternGame(songs[choice - 1]);
+    } else {
+        printf("Skipped bonus game.\n");
     }
-    if (!job_list) {
-        printf("No active job postings to post.\n");
-        return;
-    }
-    printf("Enter Job ID to post: ");
-    int job_id;
-    scanf("%d", &job_id);
-    getchar();
-    JobPost *job = job_list;
-    while (job && job->id != job_id) job = job->next;
-    if (!job) {
-        printf("Job ID not found.\n");
-        return;
-    }
-    printf("Posting job ID %d on %s...\n", job->id, cur->name);
-    printf("API Key: %s\nAPI URL: %s\n", cur->api_key, cur->api_url);
-    printf("Post successful!\n");
 }
 
-void init_social_networks() {
-    SocialNetwork *fb = malloc(sizeof(SocialNetwork));
-    strcpy(fb->name, "Facebook");
-    strcpy(fb->api_key, "FB_API_KEY");
-    strcpy(fb->api_url, "https://api.facebook.com/post");
-    fb->next = NULL;
-    SocialNetwork *insta = malloc(sizeof(SocialNetwork));
-    strcpy(insta->name, "Instagram");
-    strcpy(insta->api_key, "IG_API_KEY");
-    strcpy(insta->api_url, "https://api.instagram.com/post");
-    insta->next = NULL;
-    fb->next = insta;
-    SocialNetwork *thread = malloc(sizeof(SocialNetwork));
-    strcpy(thread->name, "Thread");
-    strcpy(thread->api_key, "THREAD_API_KEY");
-    strcpy(thread->api_url, "https://api.thread.com/post");
-    thread->next = NULL;
-    insta->next = thread;
-    SocialNetwork *linkedin = malloc(sizeof(SocialNetwork));
-    strcpy(linkedin->name, "LinkedIn");
-    strcpy(linkedin->api_key, "LINKEDIN_API_KEY");
-    strcpy(linkedin->api_url, "https://api.linkedin.com/post");
-    linkedin->next = NULL;
-    thread->next = linkedin;
-    SocialNetwork *x = malloc(sizeof(SocialNetwork));
-    strcpy(x->name, "X");
-    strcpy(x->api_key, "X_API_KEY");
-    strcpy(x->api_url, "https://api.x.com/post");
-    x->next = NULL;
-    linkedin->next = x;
-    social_list = fb;
-}
+// ===== Menu System =====
 
-void findSpecialist() {
-    init_social_networks();
-    char current_date[11];
-    time_t t = time(NULL);
-    struct tm tm = *localtime(&t);
-    snprintf(current_date, sizeof(current_date), "%04d-%02d-%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
-    move_expired_jobs(current_date);
+void danceTrainingMenu() {
+    int choice;
     while (1) {
-        printf("\n[II. Training > 6. Visual & Image Training > A. Finding People]\n");
-        printf("1. Create Job Posting\n2. View Job Postings\n3. Post on Social Networks\n4. Exit\nSelect: ");
-        int sel;
-        scanf("%d", &sel);
-        getchar();
-        switch (sel) {
+        printf("\n[II. Training > 5. Dance Training]\n");
+        printf("1. Learn Basic Dance Steps\n");
+        printf("2. Choreography Patterns\n");
+        printf("0. Back\n");
+        printf("Select > ");
+        scanf("%d", &choice);
+        switch (choice) {
             case 1:
-                create_job_posting();
+                learnDanceStep();
                 break;
             case 2:
-                printf("1. View Active Job Postings\n2. View Expired Job Postings\nSelect: ");
-                int subsel;
-                scanf("%d", &subsel);
-                getchar();
-                if (subsel == 1) view_job_postings(job_list, 0);
-                else if (subsel == 2) view_job_postings(expired_job_list, 1);
+                learnDancePattern();
                 break;
-            case 3:
-                post_on_social_networks();
-                break;
-            case 4:
-                free_jobs(job_list);
-                free_jobs(expired_job_list);
-                free_socials(social_list);
+            case 0:
                 return;
             default:
-                printf("Invalid selection.\n");
+                printf("Invalid.\n");
         }
     }
+}
+
+void trainingMenu() {
+    int choice;
+    while (1) {
+        printf("\n[II. Training Menu]\n");
+        printf("1. Health\n");
+        printf("2. Self-Management\n");
+        printf("3. Mentoring\n");
+        printf("4. Vocal Training\n");
+        printf("5. Dance Training\n");
+        printf("0. Exit\n");
+        printf("Select > ");
+        scanf("%d", &choice);
+
+        switch (choice) {
+            case 5:
+                danceTrainingMenu();
+                break;
+            case 0:
+                return;
+            default:
+                printf("Under development or invalid.\n");
+        }
+    }
+}
+
+int main() {
+    trainingMenu();
+    return 0;
 }
