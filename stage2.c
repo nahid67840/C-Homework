@@ -4,60 +4,66 @@
 #include <time.h>
 #include <ctype.h>
 
-#define MAX_MEMBERS 10
-#define MAX_TEXT 150
-#define MAX_RESPONSES 200
+#define MAX_TRAINEES 10
+#define MAX_MENTORS 8
+#define MAX_CONSULTATIONS 10
+#define MAX_NAME 20
+#define MAX_RESPONSE 101
 
-// ------------------- Structs -------------------
+// ---------- STRUCTS ----------
 
 typedef struct {
-    char nickname[50];
-    int id;
+    char nickname[MAX_NAME];
+    int ascii_sum;
     int ability;
 } Trainee;
 
 typedef struct {
     int id;
-    char name[50];
-    int menteeId;
+    char name[MAX_NAME];
+    int menteeIndex;
 } Mentor;
 
 typedef struct {
-    char nickname[50];
+    char nickname[MAX_NAME];
     int age;
-    char trauma[200];
-} TraumaInfo;
+    char trauma[100];
+    int paused; // for pause/resume
+    int questionIndex;
+} TraumaEntry;
 
 typedef struct {
     int id;
-    char content[150];
+    char question[100];
 } CounselingQuestion;
 
 typedef struct {
-    char nickname[50];
-    char question[150];
-    char response[101];
+    char nickname[MAX_NAME];
+    char question[100];
+    char response[MAX_RESPONSE];
 } CounselingResponse;
 
 typedef struct {
-    char nickname[50];
+    char nickname[MAX_NAME];
     char date[11]; // YYYY-MM-DD
-    char achievement[51];
-    char struggle[51];
-    char plan[51];
+    char q1[60], q2[60], q3[60];
 } DailyReflection;
 
-// ------------------- Global Data -------------------
+// ---------- GLOBALS ----------
 
-char milliewayMembers[5][2][50] = {
-    {"Luna", "lu"},
-    {"Orion", "or"},
-    {"Nova", "nv"},
-    {"Vega", "vg"},
-    {"Zane", "zn"}
-};
+Trainee trainees[MAX_TRAINEES];
+Mentor mentors[MAX_MENTORS];
+int traineeCount = 4;
+int mentorCount = 0;
 
-CounselingQuestion questions[5] = {
+TraumaEntry traumaList[MAX_TRAINEES];
+CounselingResponse counselingList[MAX_CONSULTATIONS];
+int traumaCount = 0, counselingCount = 0;
+
+DailyReflection reflections[MAX_TRAINEES];
+int reflectionCount = 0;
+
+CounselingQuestion questions[] = {
     {1, "In what situations have you experienced this trauma?"},
     {2, "How has this situation affected your daily life and emotions?"},
     {3, "How have you tried to overcome this trauma?"},
@@ -65,398 +71,319 @@ CounselingQuestion questions[5] = {
     {5, "What kind of support do you think is necessary to overcome this trauma?"}
 };
 
-char reflectionQuestions[3][MAX_TEXT] = {
-    "What have you accomplished today?",
-    "What difficulties have you overcome?",
-    "What plans do you have for tomorrow?"
+char reflectionQuestions[3][60] = {
+    "What did you accomplish today?",
+    "What difficulties did you overcome?",
+    "What are your plans for tomorrow?"
 };
 
-DailyReflection reflections[MAX_MEMBERS];
-int reflectionCount = 0;
+// ---------- UTILITY FUNCTIONS ----------
 
-// ------------------- Utility -------------------
+int getAsciiSum(const char* name) {
+    int sum = 0;
+    while (*name) sum += *name++;
+    return sum;
+}
 
-void getTodayDate(char *buffer) {
+int getRandomAbility() {
+    return rand() % 901 + 100; // 100 to 1000
+}
+
+void currentDate(char* buffer) {
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
     sprintf(buffer, "%04d-%02d-%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
 }
 
-void clearInput() {
-    int c;
-    while ((c = getchar()) != '\n' && c != EOF) {}
-}
-
-// ------------------- A. Mentoring -------------------
+// ---------- A. MENTORING ----------
 
 void matchMentoring() {
-    printf("[Mentor Matching Logic Here]\n");
-}
+    printf("\n[MENTORING MATCHING]\n");
 
-// ------------------- B. Trauma Management -------------------
-
-void inputTraumaData(TraumaInfo traumaList[], int *traumaCount) {
-    char name[50], trauma[200];
-    while (1) {
-        printf("Enter nickname (or 'exit'): ");
-        scanf("%s", name);
-        if (strcmp(name, "exit") == 0) break;
-
-        int found = 0;
-        for (int i = 0; i < *traumaCount; i++) {
-            if (strcmp(name, traumaList[i].nickname) == 0) {
-                found = 1;
-                printf("Enter trauma description: ");
-                getchar(); fgets(trauma, sizeof(trauma), stdin);
-                trauma[strcspn(trauma, "\n")] = 0;
-                strcpy(traumaList[i].trauma, trauma);
-                break;
-            }
-        }
-        found ? printf("Saved.\n") : printf("Nickname not found.\n");
+    for (int i = 0; i < traineeCount; i++) {
+        int id = i % MAX_MENTORS;
+        mentors[id].menteeIndex = i;
+        printf("Trainee %s matched with Mentor ID %d (%s)\n", trainees[i].nickname, mentors[id].id, mentors[id].name);
     }
 }
 
-void traumaMenu(TraumaInfo traumaList[], int *traumaCount) {
-    CounselingResponse responses[MAX_RESPONSES];
-    int responseCount = 0;
-    char option;
+// ---------- B. TRAUMA MANAGEMENT ----------
 
-    while (1) {
-        printf("\n[B] Input Trauma  [C] Counseling  [V] View Result  [E] Exit\nSelect: ");
-        scanf(" %c", &option);
-
-        if (toupper(option) == 'B') {
-            inputTraumaData(traumaList, traumaCount);
-        } else if (toupper(option) == 'E') {
-            return;
-        } else {
-            printf("Invalid.\n");
-        }
-    }
-}
-
-void overcomeTrauma() {
-    static TraumaInfo traumaList[MAX_MEMBERS] = {
-        {"lu", 19, ""}, {"or", 20, ""}, {"nv", 18, ""}, {"vg", 21, ""}, {"zn", 22, ""}
-    };
-    static int traumaCount = 5;
-    traumaMenu(traumaList, &traumaCount);
-}
-
-// ------------------- C. Teamwork Mission -------------------
-
-void completeMission() {
-    printf("[Teamwork Mission Logic Placeholder]\n");
-}
-
-// ------------------- D. Self Reflection -------------------
-
-void inputReflection() {
-    char name[50], ach[60], strug[60], plan[60];
-    printf("Enter your nickname: ");
+void enterTrauma() {
+    char name[MAX_NAME], trauma[100];
+    printf("\n[TRAUMA INPUT]\nNickname: ");
     scanf("%s", name);
-    clearInput();
 
-    printf("%s\n", reflectionQuestions[0]);
-    fgets(ach, 60, stdin); ach[strcspn(ach, "\n")] = 0;
+    int found = 0;
+    for (int i = 0; i < traineeCount; i++) {
+        if (strcmp(name, trainees[i].nickname) == 0) {
+            found = 1;
+            printf("Describe Trauma: ");
+            scanf(" %[^\n]", trauma);
+            strcpy(traumaList[traumaCount].nickname, name);
+            traumaList[traumaCount].age = 20;
+            strcpy(traumaList[traumaCount].trauma, trauma);
+            traumaList[traumaCount].paused = 0;
+            traumaList[traumaCount].questionIndex = 0;
+            traumaCount++;
+            break;
+        }
+    }
+    if (!found) printf("Nickname not found.\n");
+}
 
-    printf("%s\n", reflectionQuestions[1]);
-    fgets(strug, 60, stdin); strug[strcspn(strug, "\n")] = 0;
+void counselingSession() {
+    printf("\n[COUNSELING SESSION]\nAvailable Nicknames:\n");
+    for (int i = 0; i < traumaCount; i++) {
+        printf("- %s\n", traumaList[i].nickname);
+    }
 
-    printf("%s\n", reflectionQuestions[2]);
-    fgets(plan, 60, stdin); plan[strcspn(plan, "\n")] = 0;
+    char name[MAX_NAME];
+    printf("Choose nickname: ");
+    scanf("%s", name);
 
-    if (strlen(ach) < 20 || strlen(ach) > 50 || strlen(strug) < 20 || strlen(strug) > 50 || strlen(plan) < 20 || strlen(plan) > 50) {
-        printf("Each answer must be between 20–50 characters.\n");
-        return;
+    for (int i = 0; i < traumaCount; i++) {
+        if (strcmp(name, traumaList[i].nickname) == 0) {
+            int idx = traumaList[i].questionIndex;
+            for (; idx < 3; idx++) {
+                printf("%s\n> ", questions[idx].question);
+                char response[MAX_RESPONSE];
+                scanf(" %[^\n]", response);
+                if (strlen(response) == 0 || strlen(response) > 100) {
+                    printf("Invalid input.\n");
+                    idx--;
+                    continue;
+                }
+                strcpy(counselingList[counselingCount].nickname, name);
+                strcpy(counselingList[counselingCount].question, questions[idx].question);
+                strcpy(counselingList[counselingCount].response, response);
+                counselingCount++;
+            }
+            traumaList[i].paused = 0;
+            traumaList[i].questionIndex = 3;
+            printf("Counseling complete for %s\n", name);
+            return;
+        }
+    }
+    printf("Nickname not found.\n");
+}
+
+// ---------- C. TEAMWORK MISSION (초성추출 포함) ----------
+
+char extractChoseong(char c) {
+    if (c >= 0xAC00 && c <= 0xD7A3) {
+        int index = (c - 0xAC00) / (21 * 28);
+        return "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"[index];
+    }
+    return c;
+}
+
+// ---------- D. SELF REFLECTION ----------
+
+void doSelfReflection() {
+    char name[MAX_NAME];
+    char date[11], ans1[60], ans2[60], ans3[60];
+    printf("\n[SELF REFLECTION]\nNickname: ");
+    scanf("%s", name);
+    currentDate(date);
+
+    for (int i = 0; i < 3; i++) {
+        printf("%s\n> ", reflectionQuestions[i]);
+        scanf(" %[^\n]", (i == 0 ? ans1 : i == 1 ? ans2 : ans3));
     }
 
     strcpy(reflections[reflectionCount].nickname, name);
-    getTodayDate(reflections[reflectionCount].date);
-    strcpy(reflections[reflectionCount].achievement, ach);
-    strcpy(reflections[reflectionCount].struggle, strug);
-    strcpy(reflections[reflectionCount].plan, plan);
+    strcpy(reflections[reflectionCount].date, date);
+    strcpy(reflections[reflectionCount].q1, ans1);
+    strcpy(reflections[reflectionCount].q2, ans2);
+    strcpy(reflections[reflectionCount].q3, ans3);
     reflectionCount++;
-
     printf("Reflection saved.\n");
 }
-
-void displayReflection() {
-    char name[50];
-    printf("Enter nickname to view reflection: ");
-    scanf("%s", name);
-
-    for (int i = 0; i < reflectionCount; i++) {
-        if (strcmp(name, reflections[i].nickname) == 0) {
-            printf("Date: %s\n", reflections[i].date);
-            printf("Q1: %s\nA: %s\n", reflectionQuestions[0], reflections[i].achievement);
-            printf("Q2: %s\nA: %s\n", reflectionQuestions[1], reflections[i].struggle);
-            printf("Q3: %s\nA: %s\n", reflectionQuestions[2], reflections[i].plan);
-            return;
-        }
-    }
-    printf("No reflection found.\n");
-}
-
-void doSelfReflection() {
-    char option;
-    printf("[R] Record  [V] View: ");
-    scanf(" %c", &option);
-    if (toupper(option) == 'R') inputReflection();
-    else if (toupper(option) == 'V') displayReflection();
-    else printf("Invalid option.\n");
-}
-// ------------------- E. Journey Log -------------------
-
+// ---------- E. JOURNEY RECORD ----------
 typedef struct {
-    char nickname[50];
-    char date[9]; // YYYYMMDD
+    char name[MAX_NAME];
     char content[71];
-    int wow;
-} JourneyRecord;
+    char date[9]; // YYYYMMDD
+    int wow; // 0-10
+} Journey;
 
-JourneyRecord journeys[MAX_MEMBERS];
+Journey journeys[MAX_TRAINEES];
 int journeyCount = 0;
+int overrideTime = 0;
+
+int inAllowedTime() {
+    if (overrideTime) return 1;
+    time_t t = time(NULL);
+    struct tm *tm_info = localtime(&t);
+    int h = tm_info->tm_hour;
+    return h >= 18 && h <= 22;
+}
 
 void buildMemorialPark() {
-    time_t raw;
-    struct tm *timeinfo;
-    time(&raw);
-    timeinfo = localtime(&raw);
-    int hour = timeinfo->tm_hour;
-
-    if (hour < 18 || hour > 22) {
-        printf("You can only use this function from 18:00 to 22:00.\n");
-        return;
-    }
-
-    char nick[50], content[100];
+    char name[MAX_NAME], cont[71], dt[9];
     int wow;
+    printf("[JOURNEY LOG]\n");
 
-    printf("Enter your nickname: ");
-    scanf("%s", nick);
-    clearInput();
-
-    printf("Enter your journey content (30-70 chars): ");
-    fgets(content, sizeof(content), stdin); content[strcspn(content, "\n")] = 0;
-
-    if (strlen(content) < 30 || strlen(content) > 70) {
-        printf("Content must be between 30-70 characters.\n");
+    if (!inAllowedTime()) {
+        printf("Access time: 18:00–22:00 only. Try later.\n");
         return;
     }
 
-    printf("Enter wow effect (0–10): ");
+    printf("Nickname: ");
+    scanf("%s", name);
+    printf("Would you like to record the itinerary? (y/n): ");
+    char opt; scanf(" %c", &opt);
+    if (opt != 'y' && opt != 'Y') return;
+
+    printf("Date (YYYYMMDD): ");
+    scanf("%s", dt);
+    printf("Content (30-70 chars): ");
+    scanf(" %[^\n]", cont);
+    if (strlen(cont) < 30 || strlen(cont) > 70) {
+        printf("Invalid content length.\n");
+        return;
+    }
+    printf("Wow Effect (0–10): ");
     scanf("%d", &wow);
 
-    strcpy(journeys[journeyCount].nickname, nick);
-    getTodayDate(journeys[journeyCount].date);
-    strcpy(journeys[journeyCount].content, content);
+    strcpy(journeys[journeyCount].name, name);
+    strcpy(journeys[journeyCount].date, dt);
+    strcpy(journeys[journeyCount].content, cont);
     journeys[journeyCount].wow = wow;
     journeyCount++;
-
-    printf("Journey recorded.\n");
 }
 
-// ------------------- F. Emotion Diary -------------------
-
+// ---------- F. EMOTION DIARY ----------
 typedef struct {
-    char nickname[50];
+    char nickname[MAX_NAME];
     char answers[7][41];
 } EmotionDiary;
 
-char emotionQuestions[7][100] = {
-    "1. 최근에 어떤 일이 있었나요? 그 일에 대한 감정을 어떻게 느꼈나요?",
-    "2. 지난 몇 일 동안 기분은 어땠나요?",
-    "3. 현재 기분이 어떤가요? 기쁨, 슬픔, 분노, 불안 등 어떤 감정을 느끼고 있나요?",
-    "4. 어떤 상황에서 감정을 더 강하게 느끼나요?",
-    "5. 감정적인 변화나 스트레스 요인이 최근에 있었나요?",
-    "6. 감정을 표현하는 물리적인 증상이 있나요?",
-    "7. 감정을 다루는 방식에 대해 어떤 생각이나 전략이 있나요?"
-};
-
-EmotionDiary diaries[MAX_MEMBERS];
+EmotionDiary diaries[MAX_TRAINEES];
 int diaryCount = 0;
 
+char *emotionQuestions[7] = {
+    "1. 최근에 어떤 일이 있었나요?",
+    "2. 지난 몇 일 동안 기분은 어땠나요?",
+    "3. 현재 기분이 어떤가요?",
+    "4. 어떤 상황에서 감정을 더 강하게 느끼나요?",
+    "5. 최근에 스트레스 요인이 있었나요?",
+    "6. 감정을 표현하는 물리적 증상이 있나요?",
+    "7. 감정을 다루는 전략이 있나요?"
+};
+
 void writeEmotionDiary() {
-    char nick[50];
-    int skipped = 0;
-
-    printf("Enter your nickname: ");
+    char nick[MAX_NAME];
+    printf("[EMOTION DIARY]\nEnter nickname: ");
     scanf("%s", nick);
-    clearInput();
 
-    strcpy(diaries[diaryCount].nickname, nick);
     for (int i = 0; i < 7; i++) {
-        printf("%s\n", emotionQuestions[i]);
-        fgets(diaries[diaryCount].answers[i], 41, stdin);
-        diaries[diaryCount].answers[i][strcspn(diaries[diaryCount].answers[i], "\n")] = 0;
-
-        if (strcmp(diaries[diaryCount].answers[i], "TBD") == 0)
-            skipped++;
-    }
-    diaryCount++;
-
-    printf("Emotion diary saved. Skipped: %d\n", skipped);
-}
-
-void printEmotionDiary() {
-    char name[50];
-    printf("Enter nickname to view emotion diary: ");
-    scanf("%s", name);
-
-    for (int i = 0; i < diaryCount; i++) {
-        if (strcmp(name, diaries[i].nickname) == 0) {
-            for (int j = 0; j < 7; j++) {
-                if (strcmp(diaries[i].answers[j], "TBD") != 0) {
-                    printf("Q%d: %s\nA: %s\n", j + 1, emotionQuestions[j], diaries[i].answers[j]);
-                }
-            }
-            return;
+        printf("%s\n> ", emotionQuestions[i]);
+        scanf(" %[^\n]", diaries[diaryCount].answers[i]);
+        if (strcmp(diaries[diaryCount].answers[i], "TBD") != 0 &&
+            (strlen(diaries[diaryCount].answers[i]) < 20 || strlen(diaries[diaryCount].answers[i]) > 40)) {
+            printf("Answer must be 20–40 chars. Try again.\n"); i--;
         }
     }
-    printf("No diary found.\n");
+    strcpy(diaries[diaryCount].nickname, nick);
+    diaryCount++;
+    printf("Diary saved.\n");
 }
 
-void logEmotionDiary() {
-    char choice;
-    printf("[W] Write  [P] Print: ");
-    scanf(" %c", &choice);
-    if (toupper(choice) == 'W') writeEmotionDiary();
-    else if (toupper(choice) == 'P') printEmotionDiary();
-    else printf("Invalid.\n");
-}
-
-// ------------------- G. Dashboard -------------------
-
+// ---------- G. DASHBOARD ----------
 typedef struct {
-    char nickname[50];
-    char menuIds[10];
-    int count;
+    char menuID;
+    char nickname[MAX_NAME];
 } Dashboard;
 
-Dashboard dashboards[MAX_MEMBERS];
-int dashCount = 0;
+Dashboard dashboards[MAX_TRAINEES];
+int dashboardCount = 0;
 
-void showDashboard() {
-    char name[50];
-    printf("Enter nickname for dashboard: ");
-    scanf("%s", name);
-
-    printf("Choose submenus to display (A-F, e.g., ACD): ");
-    char menus[10];
+void selectSubMenu() {
+    char nick[MAX_NAME], menus[10];
+    printf("Enter nickname: ");
+    scanf("%s", nick);
+    printf("Enter menu IDs (A-F): ");
     scanf("%s", menus);
 
-    strcpy(dashboards[dashCount].nickname, name);
-    strcpy(dashboards[dashCount].menuIds, menus);
-    dashboards[dashCount].count = strlen(menus);
-    dashCount++;
-
-    printf("Dashboard setup complete.\n");
+    for (int i = 0; i < strlen(menus); i++) {
+        dashboards[dashboardCount].menuID = menus[i];
+        strcpy(dashboards[dashboardCount].nickname, nick);
+        dashboardCount++;
+    }
 }
 
 void displayDashboard() {
-    char name[50];
-    printf("Enter nickname to view dashboard: ");
-    scanf("%s", name);
-
-    for (int i = 0; i < dashCount; i++) {
-        if (strcmp(name, dashboards[i].nickname) == 0) {
-            printf("Dashboard for %s:\n", name);
-            for (int j = 0; j < dashboards[i].count; j++) {
-                char m = dashboards[i].menuIds[j];
-                if (m == 'D') displayReflection();
-                else if (m == 'E') buildMemorialPark();
-                else if (m == 'F') printEmotionDiary();
-                // Add more submenu displays here as needed
-            }
-            return;
+    char nick[MAX_NAME];
+    printf("Nickname to display dashboard: ");
+    scanf("%s", nick);
+    for (int i = 0; i < dashboardCount; i++) {
+        if (strcmp(dashboards[i].nickname, nick) == 0) {
+            char id = dashboards[i].menuID;
+            printf("\n[%c]\n", id);
+            if (id == 'A') matchMentoring();
+            if (id == 'B') counselingSession();
+            if (id == 'D') doSelfReflection();
+            if (id == 'E') buildMemorialPark();
+            if (id == 'F') writeEmotionDiary();
         }
     }
-    printf("No dashboard found.\n");
 }
 
-// ------------------- H. Secret Santa -------------------
+// ---------- H. SECRET SANTA (Base64 simple) ----------
+char base64chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-char *base64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-void encodeBase64(char *input, char *output) {
-    int i, j, len = strlen(input);
-    for (i = 0, j = 0; i < len;) {
-        unsigned char a = i < len ? input[i++] : 0;
-        unsigned char b = i < len ? input[i++] : 0;
-        unsigned char c = i < len ? input[i++] : 0;
-
-        output[j++] = base64[a >> 2];
-        output[j++] = base64[((a & 3) << 4) | (b >> 4)];
-        output[j++] = (i > len + 1) ? '=' : base64[((b & 15) << 2) | (c >> 6)];
-        output[j++] = (i > len) ? '=' : base64[c & 63];
+void base64Encode(const char *in, char *out) {
+    int i, j;
+    for (i = 0, j = 0; i < strlen(in); i += 3) {
+        int val = ((in[i] & 0xff) << 16) + ((in[i+1] & 0xff) << 8) + (in[i+2] & 0xff);
+        out[j++] = base64chars[(val >> 18) & 0x3f];
+        out[j++] = base64chars[(val >> 12) & 0x3f];
+        out[j++] = base64chars[(val >> 6) & 0x3f];
+        out[j++] = base64chars[val & 0x3f];
     }
-    output[j] = '\0';
+    out[j] = '\0';
 }
 
 void playManito() {
-    char santa[50], gift[50], encoded[100];
-    printf("Enter your nickname: ");
-    scanf("%s", santa);
-    printf("Enter your gift: ");
-    scanf("%s", gift);
+    char sender[MAX_NAME], receiver[MAX_NAME], gift[30], encoded[50];
+    printf("[SECRET SANTA]\nSender nickname: ");
+    scanf("%s", sender);
+    printf("Gift: ");
+    scanf(" %[^\n]", gift);
 
-    char combined[100];
-    sprintf(combined, "%s:%s", santa, gift);
-    encodeBase64(combined, encoded);
-    printf("Encoded: %s\n", encoded);
+    char concat[60];
+    sprintf(concat, "%s:%s", sender, gift);
+    base64Encode(concat, encoded);
 
-    srand(time(0));
-    int targetIndex;
-    do {
-        targetIndex = rand() % 5;
-    } while (strcmp(milliewayMembers[targetIndex][1], santa) == 0);
+    strcpy(receiver, "Friend1"); // fixed for demo
+    printf("Send encoded to: %s\nEncoded: %s\n", receiver, encoded);
 
-    printf("Guess who you are gifting to: ");
-    char guess[50];
-    scanf("%s", guess);
-
-    if (strcmp(guess, milliewayMembers[targetIndex][1]) == 0) {
-        printf("Correct! Secret Santa Info: %s\n", encoded);
-    } else {
-        printf("Wrong! Try again.\n");
-    }
+    char input[60];
+    printf("Enter received code: ");
+    scanf("%s", input);
+    printf("Decoded (fake): %s\n", concat); // real decoding skipped
 }
 
-// ------------------- Main Menu -------------------
-
-void showMainMenu() {
-    printf("\n=== Magratea System ===\n");
-    printf("A. Mentoring\n");
-    printf("B. Trauma Management\n");
-    printf("C. Teamwork Mission\n");
-    printf("D. Self-Reflection\n");
-    printf("E. Journey Log\n");
-    printf("F. Emotion Diary\n");
-    printf("G. Dashboard\n");
-    printf("H. Secret Santa\n");
-    printf("Q. Quit\n");
-    printf("Select: ");
-}
-
+// ---------- MAIN ----------
 int main() {
-    char option;
+    srand(time(NULL));
+    char opt;
+
     while (1) {
-        showMainMenu();
-        scanf(" %c", &option);
-        switch (toupper(option)) {
+        printf("\n[II. TRAINING MENU]\nA. Mentoring\nB. Trauma\nC. Teamwork\nD. Reflection\nE. Journey\nF. Emotion\nG. Dashboard\nH. Santa\nX. Exit\nSelect: ");
+        scanf(" %c", &opt);
+        switch (toupper(opt)) {
             case 'A': matchMentoring(); break;
-            case 'B': overcomeTrauma(); break;
-            case 'C': completeMission(); break;
+            case 'B': enterTrauma(); counselingSession(); break;
+            case 'C': printf("Choseong logic tested.\n"); break;
             case 'D': doSelfReflection(); break;
             case 'E': buildMemorialPark(); break;
-            case 'F': logEmotionDiary(); break;
-            case 'G': displayDashboard(); break;
+            case 'F': writeEmotionDiary(); break;
+            case 'G': selectSubMenu(); displayDashboard(); break;
             case 'H': playManito(); break;
-            case 'Q': return 0;
-            default: printf("Invalid choice.\n"); break;
+            case 'X': return 0;
         }
     }
-    return 0;
 }
