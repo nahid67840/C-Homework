@@ -2,177 +2,149 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
-#define MAX_MEMBERS 4
 #define MAX_QUESTIONS 10
-#define MAX_NAME 50
-#define MAX_SENTENCE 200
-#define MAX_WORDS 20
-#define MAX_CHAR 20
+#define MAX_QUIZ_QUESTIONS 5
 #define MAX_FLASHCARDS 24
-#define MAX_RESULTS 20
-#define MAX_DICTIONARY 30
-#define MAX_TEAM 5
+#define MAX_ATTEMPTS 3
+#define MAX_RESULTS 100
+#define MAX_SENTENCES 10
+#define MAX_WORDS 10
+#define MAX_TRAINEES 10
 
-// ---------- Common Data Structures ----------
+// Structures
 typedef struct {
-    char name[MAX_NAME];
-    char nickname[MAX_NAME];
-    char nationality[MAX_NAME];
+    int id;
+    char question[256];
+    char correctAnswer[128];
+} KoreanQuestion;
+
+typedef struct {
+    char name[50];
+    char nickname[50];
+    char nationality[30];
     int quizScore;
     char passStatus[10];
 } Trainee;
 
 typedef struct {
     int questionID;
-    char question[MAX_SENTENCE];
-    char answer[MAX_SENTENCE];
-} KoreanQuestion;
-
-typedef struct {
-    int questionID;
-    char isCorrect; // 'O' or 'X'
+    char correctness;
 } QuizAnswer;
 
 typedef struct {
-    char hangul[MAX_CHAR];
-    char eng[MAX_CHAR];
-    char pronunciation[MAX_CHAR];
-} HangulCard;
+    char hangul[10];
+    char engLetter[5];
+    char engPron[20];
+    char type[10];
+} HangulJamo;
 
 typedef struct {
-    char name[MAX_NAME];
-    char challengeType[5];
+    char name[50];
+    char challengeType[3];
     int totalScore;
     int attemptCount;
 } FlashcardResult;
 
 typedef struct {
-    char english[MAX_SENTENCE];
-    char korean[MAX_SENTENCE];
-} GrammarPair;
+    char english[256];
+    char korean[256];
+} EngKorSentence;
 
 typedef struct {
-    char nickname[MAX_NAME];
-    int score;
+    char nickname[50];
+    int grammarScore;
 } GrammarScore;
 
-typedef struct {
-    char word[MAX_CHAR];
-    char region[MAX_CHAR];
-    char standard[MAX_CHAR];
-} DialectWord;
-
-typedef struct {
-    char group[MAX_NAME];
-    char learner[MAX_NAME];
-    int score;
-    char stdLevel;
-    char diaLevel;
-} DialectResult;
-
-typedef struct {
-    char rom[MAX_SENTENCE];
-    char kor[MAX_SENTENCE];
-    char author[MAX_NAME];
-} DictationData;
-
-typedef struct {
-    char group[MAX_NAME];
-    char name[MAX_NAME];
-    int totalScore;
-    int maxMatch;
-    int minMatch;
-} DictationResult;
-
-typedef struct {
-    int avgScore;
-    int minScore;
-    int timeLimit;
-} TeamBaseline;
-
-typedef struct {
-    char teamName[MAX_NAME];
-    int avgScore;
-    int minScore;
-    int timeUsed;
-    char result[10];
-} TeamPerformance;
-
-// ---------- Global Variables ----------
-Trainee trainees[MAX_MEMBERS] = {
-    {"Park Ji-yeon", "ariel", "Korean", 0, "Fail"},
-    {"Ali", "ali", "Bangladeshi", 0, "Fail"},
-    {"Nahid", "nahid", "Bangladeshi", 0, "Fail"},
-    {"Vinh", "vinh", "Vietnamese", 0, "Fail"}
-};
-
+// Global Data
 KoreanQuestion questionBank[MAX_QUESTIONS] = {
     {1, "What is 'Hello' in Korean?", "안녕하세요"},
     {2, "What is 'Thank you' in Korean?", "감사합니다"},
     {3, "What is 'Sorry' in Korean?", "죄송합니다"},
-    {4, "What is 'Goodbye' in Korean?", "안녕히 가세요"},
-    {5, "What is 'Yes' in Korean?", "네"},
-    {6, "What is 'No' in Korean?", "아니요"},
-    {7, "What is 'I am hungry' in Korean?", "배고파요"},
-    {8, "What is 'I love you' in Korean?", "사랑해요"},
-    {9, "What is 'Where is the bathroom?' in Korean?", "화장실 어디에요?"},
-    {10, "What is 'Nice to meet you' in Korean?", "반갑습니다"}
+    {4, "What is 'Yes' in Korean?", "네"},
+    {5, "What is 'No' in Korean?", "아니요"},
+    {6, "What is 'Goodbye' in Korean?", "안녕히 가세요"},
+    {7, "What is 'Please' in Korean?", "주세요"},
+    {8, "What is 'How are you?' in Korean?", "잘 지냈어요?"},
+    {9, "What is 'Delicious' in Korean?", "맛있어요"},
+    {10, "What is 'I love you' in Korean?", "사랑해요"}
 };
 
-// ---------- Function Prototypes (Problem-Specific) ----------
+Trainee trainees[MAX_TRAINEES] = {
+    {"Alex Smith", "Alex", "USA", 0, ""},
+    {"Maria Gomez", "Maria", "Mexico", 0, ""},
+    {"Takeshi Tanaka", "Takeshi", "Japan", 0, ""},
+    {"Park Ji-yeon", "Jiyeon", "Korea", 0, ""}
+};
+
+QuizAnswer quizAnswers[MAX_QUIZ_QUESTIONS];
+HangulJamo flashcards[MAX_FLASHCARDS] = {
+    {"ㄱ", "g", "giyeok", "consonant"}, {"ㄴ", "n", "nieun", "consonant"},
+    {"ㄷ", "d", "digeut", "consonant"}, {"ㄹ", "r", "rieul", "consonant"},
+    {"ㅁ", "m", "mieum", "consonant"}, {"ㅂ", "b", "bieup", "consonant"},
+    {"ㅅ", "s", "siot", "consonant"}, {"ㅇ", "", "ieung", "consonant"},
+    {"ㅈ", "j", "jieut", "consonant"}, {"ㅊ", "ch", "chieut", "consonant"},
+    {"ㅋ", "k", "kieuk", "consonant"}, {"ㅌ", "t", "tieut", "consonant"},
+    {"ㅍ", "p", "pieup", "consonant"}, {"ㅎ", "h", "hieut", "consonant"},
+    {"ㅏ", "a", "a", "vowel"}, {"ㅑ", "ya", "ya", "vowel"},
+    {"ㅓ", "eo", "eo", "vowel"}, {"ㅕ", "yeo", "yeo", "vowel"},
+    {"ㅗ", "o", "o", "vowel"}, {"ㅛ", "yo", "yo", "vowel"},
+    {"ㅜ", "u", "u", "vowel"}, {"ㅠ", "yu", "yu", "vowel"},
+    {"ㅡ", "eu", "eu", "vowel"}, {"ㅣ", "i", "i", "vowel"}
+};
+
+FlashcardResult results[MAX_RESULTS];
+int resultCount = 0;
+
+EngKorSentence sentences[MAX_SENTENCES] = {
+    {"I eat rice every day.", "나는 매일 밥을 먹어요"},
+    {"She reads a book at night.", "그녀는 밤에 책을 읽어요"},
+    {"We go to school together.", "우리는 함께 학교에 가요"},
+    {"He drinks coffee in the morning.", "그는 아침에 커피를 마셔요"},
+    {"They play soccer in the park.", "그들은 공원에서 축구를 해요"},
+    {"You study Korean very hard.", "당신은 한국어를 열심히 공부해요"},
+    {"The cat is sleeping on the sofa.", "고양이는 소파에서 자고 있어요"},
+    {"My father drives a car.", "아버지는 차를 운전해요"},
+    {"The children are playing games.", "아이들은 게임을 하고 있어요"},
+    {"I am writing a letter now.", "나는 지금 편지를 쓰고 있어요"}
+};
+
+GrammarScore grammarScores[MAX_TRAINEES] = {
+    {"Alex", 0}, {"Maria", 0}, {"Takeshi", 0}, {"Jiyeon", 0}
+};
+// Function declarations
 void testKoreanLang();
 void learnHangul();
 void learnKoreanGrammar();
-void doWordRelay();
-void doDictionaryGame();
-void learnDialect();
-void doDictation();
-void inputBaseLine(TeamBaseline *base, int maxScore, int minTime, int maxTime);
-void evalTeamPerformance(TeamPerformance *team, int scores[], int count, int timeUsed, TeamBaseline base);
-
-// ---------- Main Menu ----------
-void showMenu() {
-    int choice;
-    while (1) {
-        printf("\n====== II. Training > 3. Language and Pronunciation Training ======\n");
-        printf("1. Korean Quiz\n");
-        printf("2. Hangul Jamo Learning\n");
-        printf("3. Learning Korean Grammar\n");
-        printf("4. Korean Word Relay\n");
-        printf("5. Dictionary Game\n");
-        printf("6. Dialect Learning\n");
-        printf("7. Dictation Test\n");
-        printf("8. Exit\n");
-        printf("Select a menu option: ");
-        scanf("%d", &choice);
-        getchar();
-
-        switch (choice) {
-            case 1:
-                testKoreanLang(); break;
-            case 2:
-                learnHangul(); break;
-            case 3:
-                learnKoreanGrammar(); break;
-            case 4:
-                doWordRelay(); break;
-            case 5:
-                doDictionaryGame(); break;
-            case 6:
-                learnDialect(); break;
-            case 7:
-                doDictation(); break;
-            case 8:
-                printf("Exiting program.\n"); return;
-            default:
-                printf("Invalid option. Try again.\n");
-        }
-    }
-}
 
 int main() {
     srand(time(NULL));
-    showMenu();
-    return 0;
+    int choice;
+
+    while (1) {
+        printf("\n==== Millieways Language Training Menu ====\n");
+        printf("1. Korean Quiz\n");
+        printf("2. Hangul Jamo Learning\n");
+        printf("3. Learn Korean Grammar\n");
+        printf("0. Exit\nChoose: ");
+        scanf("%d", &choice); getchar();  // To consume the newline
+
+        switch (choice) {
+            case 1:
+                testKoreanLang();  // Problem 5
+                break;
+            case 2:
+                learnHangul();     // Problem 6
+                break;
+            case 3:
+                learnKoreanGrammar();  // Problem 7
+                break;
+            case 0:
+                printf("Exiting program. Goodbye!\n");
+                return 0;
+            default:
+                printf("Invalid choice. Please try again.\n");
+        }
+    }
 }
