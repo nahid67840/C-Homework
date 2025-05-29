@@ -41,6 +41,18 @@ typedef struct {
 GenderRange maleRange = {85.0, 180.0, 2.5, 3.6, 0.2, 0.6};
 GenderRange femaleRange = {165.0, 255.0, 3.5, 4.7, 0.3, 1.0};
 
+// ---------- Music Theory Structures ----------
+typedef struct {
+    char note;     // A-G
+    int octave;    // 1-8
+} MusicNote;
+
+typedef struct {
+    MusicNote root;
+    MusicNote third;
+    MusicNote fifth;
+} Chord;
+
 // ---------- Vocal Evaluation Functions ----------
 float calculateStability(int *arr, int n) {
     int sumDiff = 0;
@@ -112,7 +124,7 @@ void printVocalInfo() {
     }
 }
 
-// ---------- My Voice Game Functions ----------
+// ---------- My Voice Game ----------
 float randomInRange(float min, float max) {
     return min + ((float)rand() / RAND_MAX) * (max - min);
 }
@@ -186,7 +198,6 @@ void findMyVoice() {
         printf("\n😅 Try again next time to discover your voice!\n");
     }
 
-    // Bonus: GRBAS voice tone scale game
     printf("\n--- GRBAS Voice Tone Scale ---\n");
     const char *labels[] = {"Grade", "Roughness", "Breathiness", "Asthenia", "Strain"};
     for (int i = 0; i < 5; i++) {
@@ -194,17 +205,91 @@ void findMyVoice() {
     }
 }
 
+// ---------- Music Theory ----------
+int isValidNote(char note) {
+    return (note >= 'A' && note <= 'G');
+}
+
+int isValidOctave(int octave) {
+    return (octave >= 1 && octave <= 8);
+}
+
+int sameOctave(Chord *ch) {
+    return ch->root.octave == ch->third.octave && ch->root.octave == ch->fifth.octave;
+}
+
+int uniqueNotes(Chord *ch) {
+    return ch->root.note != ch->third.note &&
+           ch->root.note != ch->fifth.note &&
+           ch->third.note != ch->fifth.note;
+}
+
+int noteToIndex(char note) {
+    return note - 'A'; // A=0, B=1, ..., G=6
+}
+
+const char* harmonyLevel(int interval13, int interval15) {
+    if (interval13 <= 2 && interval15 >= 4) return "Good Harmony";
+    if (interval13 <= 3 && interval15 >= 3) return "Moderate Harmony";
+    return "Poor Harmony";
+}
+
+void learnMusicTheory() {
+    Chord chord;
+
+    printf("Enter root note (A-G): ");
+    scanf(" %c", &chord.root.note);
+    printf("Enter root octave (1-8): ");
+    scanf("%d", &chord.root.octave);
+
+    printf("Enter third note (A-G): ");
+    scanf(" %c", &chord.third.note);
+    printf("Enter third octave (1-8): ");
+    scanf("%d", &chord.third.octave);
+
+    printf("Enter fifth note (A-G): ");
+    scanf(" %c", &chord.fifth.note);
+    printf("Enter fifth octave (1-8): ");
+    scanf("%d", &chord.fifth.octave);
+
+    if (!isValidNote(chord.root.note) || !isValidNote(chord.third.note) || !isValidNote(chord.fifth.note) ||
+        !isValidOctave(chord.root.octave) || !isValidOctave(chord.third.octave) || !isValidOctave(chord.fifth.octave)) {
+        printf("Invalid note or octave input.\n");
+        return;
+    }
+
+    printf("\nChord Info:\nRoot: %c%d  Third: %c%d  Fifth: %c%d\n",
+           chord.root.note, chord.root.octave,
+           chord.third.note, chord.third.octave,
+           chord.fifth.note, chord.fifth.octave);
+
+    if (!sameOctave(chord) || !uniqueNotes(chord)) {
+        printf("❌ Invalid chord: Notes must be unique and in same octave.\n");
+        return;
+    }
+
+    int rootIdx = noteToIndex(chord.root.note);
+    int thirdIdx = noteToIndex(chord.third.note);
+    int fifthIdx = noteToIndex(chord.fifth.note);
+
+    int interval13 = abs(thirdIdx - rootIdx);
+    int interval15 = abs(fifthIdx - rootIdx);
+
+    printf("✅ Valid chord.\n🎵 Harmony Level: %s\n", harmonyLevel(interval13, interval15));
+}
+
 // ---------- Menu ----------
 void stage4Menu() {
     int choice;
     while (1) {
-        printf("\n[Stage 4 Menu] 1. Evaluate Vocal  2. Show Results  3. Find My Voice  0. Exit\n");
+        printf("\n[Stage 4 Menu] 1. Evaluate Vocal  2. Show Results  3. Find My Voice  4. Music Theory  0. Exit\n");
         printf("Enter your choice: ");
         scanf("%d", &choice);
         switch (choice) {
             case 1: evalVocal(); break;
             case 2: printVocalInfo(); break;
             case 3: findMyVoice(); break;
+            case 4: learnMusicTheory(); break;
             case 0: return;
             default: printf("Invalid option.\n");
         }
