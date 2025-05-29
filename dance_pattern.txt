@@ -1,0 +1,6 @@
+Wave,Waving movement of arms with fluid motion
+Slide,Sliding across stage with horizontal motion
+Lock,Sharp stops in middle of fluid dance
+Pop,Quick muscle contractions for sharp effect
+Spin,Rotation-based moves on foot or torso
+Bounce,Up-down rhythm-based body motion
