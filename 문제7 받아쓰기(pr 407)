@@ -1,0 +1,147 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <time.h>
+
+#define MAX_DATASETS 10
+#define MAX_SENTENCE_LENGTH 200
+#define MAX_NAME_LENGTH 50
+#define MAX_MEMBERS 10
+
+typedef struct {
+    char korean[MAX_SENTENCE_LENGTH];
+    char romanized[MAX_SENTENCE_LENGTH];
+    char inputter[MAX_NAME_LENGTH];
+    int isUserInput;
+} SentencePair;
+
+typedef struct {
+    char memberName[MAX_NAME_LENGTH];
+    int totalScore;
+    int maxMatchWords;
+    int minMatchWords;
+} Evaluation;
+
+typedef struct {
+    char name[MAX_NAME_LENGTH];
+    char nationality[MAX_NAME_LENGTH];
+} Member;
+
+int evalWordMatchingRatio(char *input, char *correct) {
+    int match = 0;
+    char inputCopy[MAX_SENTENCE_LENGTH], correctCopy[MAX_SENTENCE_LENGTH];
+    strcpy(inputCopy, input);
+    strcpy(correctCopy, correct);
+    char *inputWord = strtok(inputCopy, " ");
+    char *correctWord = strtok(correctCopy, " ");
+    while (inputWord && correctWord) {
+        if (strcmp(inputWord, correctWord) == 0) match++;
+        inputWord = strtok(NULL, " ");
+        correctWord = strtok(NULL, " ");
+    }
+    return match;
+}
+
+void inputKoreanSentences(SentencePair *dataset, int *count, Member *members, int memberCount) {
+    char name[MAX_NAME_LENGTH];
+    printf("입력자 이름: ");
+    scanf(" %s", name);
+    int found = 0;
+    for (int i = 0; i < memberCount; i++) {
+        if (strcmp(members[i].name, name) == 0 && strcmp(members[i].nationality, "Korea") == 0) {
+            found = 1;
+            break;
+        }
+    }
+    if (!found) {
+        printf("한국인 멤버가 아닙니다.\n");
+        return;
+    }
+    while (*count < MAX_DATASETS) {
+        printf("[%d] 로마자 발음: ", *count + 1);
+        scanf(" %[^\n]", dataset[*count].romanized);
+        printf("[%d] 한국어 문장: ", *count + 1);
+        scanf(" %[^\n]", dataset[*count].korean);
+        strcpy(dataset[*count].inputter, name);
+        dataset[*count].isUserInput = 1;
+        (*count)++;
+    }
+    printf("문장 입력 완료.\n");
+}
+
+void playGame(SentencePair *dataset, int datasetCount, Member *members, int memberCount, Evaluation *results, int *evalCount) {
+    for (int i = 0; i < memberCount; i++) {
+        if (strcmp(members[i].nationality, "Korea") == 0) continue;
+        char name[MAX_NAME_LENGTH];
+        strcpy(name, members[i].name);
+        char answer[5][MAX_SENTENCE_LENGTH];
+        int matchWords[5];
+        int totalScore = 0;
+        srand(time(NULL));
+        for (int j = 0; j < 5; j++) {
+            int idx = rand() % datasetCount;
+            printf("Q%d. \"%s\" => ", j + 1, dataset[idx].romanized);
+            scanf(" %[^\n]", answer[j]);
+            matchWords[j] = evalWordMatchingRatio(answer[j], dataset[idx].korean);
+            totalScore += matchWords[j] * 4;
+        }
+        int max = matchWords[0], min = matchWords[0];
+        for (int j = 1; j < 5; j++) {
+            if (matchWords[j] > max) max = matchWords[j];
+            if (matchWords[j] < min) min = matchWords[j];
+        }
+        strcpy(results[*evalCount].memberName, name);
+        results[*evalCount].totalScore = totalScore;
+        results[*evalCount].maxMatchWords = max;
+        results[*evalCount].minMatchWords = min;
+        (*evalCount)++;
+    }
+}
+
+int compareTotalScoreDesc(const void *a, const void *b) {
+    return ((Evaluation *)b)->totalScore - ((Evaluation *)a)->totalScore;
+}
+
+int compareMaxMatchAsc(const void *a, const void *b) {
+    return ((Evaluation *)a)->maxMatchWords - ((Evaluation *)b)->maxMatchWords;
+}
+
+void showResults(Evaluation *results, int evalCount) {
+    for (int i = 0; i < evalCount; i++) {
+        printf("이름: %s | 총점: %d | 최대 일치 단어: %d | 최소 일치 단어: %d\n",
+               results[i].memberName, results[i].totalScore,
+               results[i].maxMatchWords, results[i].minMatchWords);
+    }
+}
+
+void sortResults(Evaluation *results, int evalCount) {
+    int sortType, column;
+    printf("정렬 방식 선택 (1: 오름차순, 2: 내림차순): ");
+    scanf("%d", &sortType);
+    printf("정렬 기준 (1: 총점, 2: 최대 일치 단어): ");
+    scanf("%d", &column);
+    if (sortType == 1 && column == 2)
+        qsort(results, evalCount, sizeof(Evaluation), compareMaxMatchAsc);
+    else
+        qsort(results, evalCount, sizeof(Evaluation), compareTotalScoreDesc);
+    showResults(results, evalCount);
+}
+
+void doDictation() {
+    Member members[MAX_MEMBERS] = {
+        {"Arthur", "USA"},
+        {"Ford", "UK"},
+        {"Zaphod", "Canada"},
+        {"Trillian", "France"},
+        {"박지연", "Korea"}
+    };
+    int memberCount = 5;
+    SentencePair dataset[MAX_DATASETS];
+    int datasetCount = 0;
+    Evaluation results[MAX_MEMBERS];
+    int evalCount = 0;
+
+    inputKoreanSentences(dataset, &datasetCount, members, memberCount);
+    playGame(dataset, datasetCount, members, memberCount, results, &evalCount);
+    sortResults(results, evalCount);
+}
