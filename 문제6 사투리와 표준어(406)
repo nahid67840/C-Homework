@@ -1,0 +1,162 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define DIALECT_COUNT 20
+#define REGION_COUNT 4
+#define DIALECTS_PER_REGION 5
+#define NAME_LEN 20
+#define GROUP_NAME_LEN 30
+
+typedef struct {
+    char dialect[NAME_LEN];
+    char region[NAME_LEN];
+    char standard[NAME_LEN];
+} Dialect;
+
+typedef struct {
+    char groupName[GROUP_NAME_LEN];
+    char memberName[NAME_LEN];
+    int scoreStd;
+    int scoreDia;
+    char gradeStd;
+    char gradeDia;
+} Achievement;
+
+char* milliways[] = {"아서", "고은", "민준", "수빈", "하람"};
+int milliwaysCount = 5;
+
+Dialect dialects[DIALECT_COUNT] = {
+    {"머시써", "경상도", "멋있어"},
+    {"그카이", "경상도", "그러니까"},
+    {"와따", "경상도", "왔다"},
+    {"안카나", "경상도", "아니잖아"},
+    {"머라카노", "경상도", "뭐라고 하니"},
+    {"우짜노", "전라도", "어떻게 해"},
+    {"거시기", "전라도", "그것"},
+    {"허벌나게", "전라도", "엄청나게"},
+    {"벼라별", "전라도", "온갖"},
+    {"참말로", "전라도", "정말로"},
+    {"마이무따", "충청도", "많이 먹었다"},
+    {"그려", "충청도", "그래"},
+    {"허여간", "충청도", "하여간"},
+    {"우덜", "충청도", "우리들"},
+    {"기래유", "충청도", "그래요"},
+    {"몰라용", "강원도", "몰라요"},
+    {"왔구나양", "강원도", "왔구나"},
+    {"그래양", "강원도", "그래"},
+    {"밥무러가자양", "강원도", "밥 먹으러 가자"},
+    {"어디가양", "강원도", "어디가"}
+};
+
+int getRandomRegionIndex() {
+    return rand() % REGION_COUNT;
+}
+
+char getGrade(int score) {
+    if (score >= 90) return 'A';
+    else if (score >= 80) return 'B';
+    else if (score >= 70) return 'C';
+    else return 'F';
+}
+
+void initializeAchievementLevel(Achievement* achievements, char* groupName, char** members, int memberCount) {
+    for (int i = 0; i < memberCount; i++) {
+        strncpy(achievements[i].groupName, groupName, GROUP_NAME_LEN);
+        strncpy(achievements[i].memberName, members[i], NAME_LEN);
+        achievements[i].scoreStd = 0;
+        achievements[i].scoreDia = 0;
+        achievements[i].gradeStd = 'F';
+        achievements[i].gradeDia = 'F';
+    }
+}
+
+void guessStdWord(Achievement* achv, Dialect* dialects) {
+    int correct = 0;
+    int regions[2];
+    regions[0] = getRandomRegionIndex();
+    do {
+        regions[1] = getRandomRegionIndex();
+    } while (regions[1] == regions[0]);
+
+    for (int i = 0; i < DIALECT_COUNT; i++) {
+        if (strcmp(dialects[i].region, dialects[regions[0]*DIALECTS_PER_REGION].region) == 0 ||
+            strcmp(dialects[i].region, dialects[regions[1]*DIALECTS_PER_REGION].region) == 0) {
+            printf("사투리: %s\n표준어 입력: ", dialects[i].dialect);
+            char input[NAME_LEN];
+            scanf("%s", input);
+            if (strcmp(input, dialects[i].standard) == 0) correct++;
+        }
+    }
+
+    achv->scoreStd = correct * 10;
+    achv->gradeStd = getGrade(achv->scoreStd);
+}
+
+void guessDialectWord(Achievement* achv, Dialect* dialects) {
+    int correct = 0;
+    for (int i = 0; i < 10; i++) {
+        int index = rand() % DIALECT_COUNT;
+        int regionIndex = getRandomRegionIndex();
+        printf("표준어: %s (%s 지역 사투리 입력): ", dialects[index].standard, dialects[regionIndex * DIALECTS_PER_REGION].region);
+        char input[NAME_LEN];
+        scanf("%s", input);
+        for (int j = 0; j < DIALECTS_PER_REGION; j++) {
+            int idx = regionIndex * DIALECTS_PER_REGION + j;
+            if (strcmp(input, dialects[idx].dialect) == 0 && strcmp(dialects[idx].standard, dialects[index].standard) == 0) {
+                correct++;
+                break;
+            }
+        }
+    }
+    achv->scoreDia = correct * 10;
+    achv->gradeDia = getGrade(achv->scoreDia);
+}
+
+void learnDialect() {
+    srand((unsigned int)time(NULL));
+    Achievement achievements[milliwaysCount];
+    initializeAchievementLevel(achievements, "밀리웨이즈", milliways, milliwaysCount);
+
+    printf("학습자 선택:\n");
+    for (int i = 0; i < milliwaysCount; i++) {
+        printf("%d. %s\n", i + 1, milliways[i]);
+    }
+    int learnerIndex;
+    scanf("%d", &learnerIndex);
+    learnerIndex--;
+
+    int stdDone = 0, diaDone = 0;
+    while (!(stdDone && diaDone)) {
+        printf("1. 표준어 맞추기\n2. 지역 별 사투리 맞추기\n선택: ");
+        int choice;
+        scanf("%d", &choice);
+        if (choice == 1 && !stdDone) {
+            guessStdWord(&achievements[learnerIndex], dialects);
+            stdDone = 1;
+        } else if (choice == 2 && !diaDone) {
+            guessDialectWord(&achievements[learnerIndex], dialects);
+            diaDone = 1;
+        } else {
+            printf("이미 완료한 학습입니다. 다른 항목을 선택하세요.\n");
+        }
+    }
+
+    printf("\n--- 학습 결과 ---\n");
+    printf("학습자: %s\n", achievements[learnerIndex].memberName);
+
+    switch (achievements[learnerIndex].gradeStd) {
+        case 'A': puts("당신은 표준어 전문가 입니다."); break;
+        case 'B': puts("당신의 표준어 실력은 훌륭합니다."); break;
+        case 'C': puts("표준어에 익숙하네요."); break;
+        default:  puts("조금 더 공부해서 다시 도전 하세요."); break;
+    }
+
+    switch (achievements[learnerIndex].gradeDia) {
+        case 'A': puts("당신은 사투리 전문가 입니다."); break;
+        case 'B': puts("당신의 사투리 실력은 훌륭합니다."); break;
+        case 'C': puts("사투리에 익숙하네요."); break;
+        default:  puts("조금 더 공부해서 다시 도전 하세요."); break;
+    }
+}
