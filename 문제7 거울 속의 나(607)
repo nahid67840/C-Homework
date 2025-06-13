@@ -1,0 +1,110 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define MAX_LINES 10
+#define MAX_LENGTH 256
+
+typedef struct {
+    char original[MAX_LINES][MAX_LENGTH];
+    char mirrored[MAX_LINES][MAX_LENGTH];
+    int count;
+} MirroredText;
+
+typedef struct {
+    char userInput[MAX_LINES][MAX_LENGTH];
+} AnswerText;
+
+MirroredText mt;
+AnswerText at;
+
+char mirrorMap(char c) {
+    switch (c) {
+        case 'b': return 'd';
+        case 'd': return 'b';
+        case 'p': return 'q';
+        case 'q': return 'p';
+        case '(': return ')';
+        case ')': return '(';
+        case '/': return '\\';
+        case '\\': return '/';
+        case '<': return '>';
+        case '>': return '<';
+        default: return c;
+    }
+}
+
+void reverseAndMirror(char *dst, const char *src) {
+    int len = strlen(src);
+    for (int i = 0; i < len; ++i) {
+        dst[i] = mirrorMap(src[len - 1 - i]);
+    }
+    dst[len] = '\0';
+}
+
+void LoadOriginalFile(const char *filename) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) {
+        printf("파일 열기 실패: %s\n", filename);
+        exit(1);
+    }
+
+    mt.count = 0;
+    while (fgets(mt.original[mt.count], MAX_LENGTH, fp)) {
+        mt.original[mt.count][strcspn(mt.original[mt.count], "\r\n")] = '\0';
+        reverseAndMirror(mt.mirrored[mt.count], mt.original[mt.count]);
+        mt.count++;
+        if (mt.count >= MAX_LINES) break;
+    }
+
+    fclose(fp);
+    printf("원본 텍스트 %d줄 로드 완료\n", mt.count);
+}
+
+void InputMirrorText() {
+    int success = 0;
+    int failedIndices[4];
+    int failCount = 0;
+
+    int indices[MAX_LINES];
+    for (int i = 0; i < mt.count; ++i) indices[i] = i;
+    for (int i = mt.count - 1; i > 0; --i) {
+        int j = rand() % (i + 1);
+        int tmp = indices[i]; indices[i] = indices[j]; indices[j] = tmp;
+    }
+
+    for (int i = 0; i < 4 && i < mt.count; ++i) {
+        int idx = indices[i];
+        printf("\n원래 문장: %s\n", mt.original[idx]);
+        printf("거울 모드 텍스트 입력: ");
+        fgets(at.userInput[idx], MAX_LENGTH, stdin);
+        at.userInput[idx][strcspn(at.userInput[idx], "\r\n")] = '\0';
+
+        if (strcmp(at.userInput[idx], mt.mirrored[idx]) == 0) {
+            printf("정답입니다!\n");
+            success++;
+        } else {
+            printf("오답입니다. 정답: %s\n", mt.mirrored[idx]);
+            failedIndices[failCount++] = idx;
+        }
+    }
+
+    printf("\n성공률: %d/4\n", success);
+    if (failCount > 0) {
+        printf("실패한 문장:\n");
+        for (int i = 0; i < failCount; ++i) {
+            int idx = failedIndices[i];
+            printf("- %s (정답: %s)\n", mt.original[idx], mt.mirrored[idx]);
+        }
+    }
+}
+
+void InputOriginalText() {
+    int success = 0;
+    int failedIndices[4];
+    int failCount = 0;
+
+    int indices[MAX_LINES];
+    for (int i = 0; i < mt.count; ++i) indices[i] = i;
+    for (int i = mt.count - 1; i > 0;
