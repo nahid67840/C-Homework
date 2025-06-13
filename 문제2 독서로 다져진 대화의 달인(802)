@@ -1,0 +1,258 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_TITLE_LEN 100
+#define MAX_AUTHOR_LEN 50
+
+typedef struct BookList {
+    int order;
+    char title[MAX_TITLE_LEN];
+    char author[MAX_AUTHOR_LEN];
+    struct BookList *next;
+} BookList;
+
+BookList *readingList = NULL;
+BookList *readList = NULL;
+
+void printBooks(const BookList *head) {
+    if (!head) {
+        printf("목록이 비어있습니다.\n");
+        return;
+    }
+    printf("순번\t제목\t저자\n");
+    const BookList *cur = head;
+    while (cur) {
+        printf("%d\t%s\t%s\n", cur->order, cur->title, cur->author);
+        cur = cur->next;
+    }
+}
+
+int isOrderExist(BookList *head, int order) {
+    while (head) {
+        if (head->order == order) return 1;
+        head = head->next;
+    }
+    return 0;
+}
+
+BookList *createNode(int order, const char *title, const char *author) {
+    BookList *node = malloc(sizeof(BookList));
+    if (!node) return NULL;
+    node->order = order;
+    strncpy(node->title, title, MAX_TITLE_LEN - 1);
+    node->title[MAX_TITLE_LEN - 1] = '\0';
+    strncpy(node->author, author, MAX_AUTHOR_LEN - 1);
+    node->author[MAX_AUTHOR_LEN - 1] = '\0';
+    node->next = NULL;
+    return node;
+}
+
+int insertBookSorted(BookList **head, BookList *newNode) {
+    if (!head || !newNode) return 0;
+    if (*head == NULL || (*head)->order > newNode->order) {
+        newNode->next = *head;
+        *head = newNode;
+        return 1;
+    }
+    BookList *cur = *head;
+    while (cur->next && cur->next->order < newNode->order) {
+        cur = cur->next;
+    }
+    newNode->next = cur->next;
+    cur->next = newNode;
+    return 1;
+}
+
+int loadReadingList(const char *filename) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) {
+        printf("파일 열기 실패: %s\n", filename);
+        return 0;
+    }
+    char line[256];
+    while (fgets(line, sizeof(line), fp)) {
+        if (strlen(line) < 5) continue;
+        char *token = strtok(line, ",");
+        if (!token) continue;
+        int order = atoi(token);
+        token = strtok(NULL, ",");
+        if (!token) continue;
+        char *title = token;
+        token = strtok(NULL, "\r\n");
+        if (!token) continue;
+        char *author = token;
+
+        if (isOrderExist(readingList, order)) continue;
+
+        BookList *node = createNode(order, title, author);
+        if (!node) {
+            fclose(fp);
+            return 0;
+        }
+        insertBookSorted(&readingList, node);
+    }
+    fclose(fp);
+    return 1;
+}
+
+void addBook() {
+    int order;
+    char title[MAX_TITLE_LEN];
+    char author[MAX_AUTHOR_LEN];
+    printf("추가할 책의 읽는 순번 입력: ");
+    scanf("%d", &order);
+    getchar();
+    if (order < 1) return;
+    printf("책 제목 입력: ");
+    fgets(title, sizeof(title), stdin);
+    title[strcspn(title, "\r\n")] = 0;
+    printf("저자 입력: ");
+    fgets(author, sizeof(author), stdin);
+    author[strcspn(author, "\r\n")] = 0;
+
+    BookList *cur = readingList;
+    while (cur) {
+        if (cur->order >= order) cur->order++;
+        cur = cur->next;
+    }
+
+    BookList *newNode = createNode(order, title, author);
+    if (!newNode) return;
+    insertBookSorted(&readingList, newNode);
+
+    printBooks(readingList);
+}
+
+void changeOrder() {
+    int oldOrder, newOrder;
+    printf("변경할 원본 순번 입력: ");
+    scanf("%d", &oldOrder);
+    printf("변경 대상 순번 입력: ");
+    scanf("%d", &newOrder);
+    if (oldOrder == newOrder) return;
+    if (oldOrder < 1 || newOrder < 1) return;
+
+    BookList *target = NULL, *cur = readingList;
+    while (cur) {
+        if (cur->order == oldOrder) {
+            target = cur;
+            break;
+        }
+        cur = cur->next;
+    }
+    if (!target) return;
+
+    target->order = -1;
+
+    cur = readingList;
+    while (cur) {
+        if (cur->order >= newOrder && cur->order < oldOrder)
+            cur->order++;
+        else if (cur->order <= newOrder && cur->order > oldOrder)
+            cur->order--;
+        cur = cur->next;
+    }
+    target->order = newOrder;
+
+    BookList *tmpList = NULL;
+    cur = readingList;
+    while (cur) {
+        BookList *next = cur->next;
+        cur->next = NULL;
+        insertBookSorted(&tmpList, cur);
+        cur = next;
+    }
+    readingList = tmpList;
+
+    printBooks(readingList);
+}
+
+void removeOrder() {
+    int order;
+    printf("제거할 순번 입력: ");
+    scanf("%d", &order);
+    if (order < 1) return;
+
+    BookList *prev = NULL, *cur = readingList;
+    while (cur && cur->order != order) {
+        prev = cur;
+        cur = cur->next;
+    }
+    if (!cur) return;
+
+    if (prev) prev->next = cur->next;
+    else readingList = cur->next;
+    free(cur);
+
+    cur = readingList;
+    while (cur) {
+        if (cur->order > order) cur->order--;
+        cur = cur->next;
+    }
+    printBooks(readingList);
+}
+
+void markBookAsRead() {
+    int order;
+    printf("읽은 책 순번 입력: ");
+    scanf("%d", &order);
+    BookList *cur = readingList;
+    while (cur && cur->order != order) cur = cur->next;
+    if (!cur) return;
+
+    BookList *rCur = readList;
+    while (rCur) {
+        if (rCur->order == order) return;
+        rCur = rCur->next;
+    }
+
+    BookList *newNode = createNode(cur->order, cur->title, cur->author);
+    if (!newNode) return;
+    insertBookSorted(&readList, newNode);
+
+    printBooks(readList);
+}
+
+void doReadingList() {
+    if (!loadReadingList("book_list.txt")) return;
+    int choice;
+    while (1) {
+        printf("\n[독서 목록 관리]\n");
+        printf("1. 전체 목록 출력\n");
+        printf("2. 새 책 추가\n");
+        printf("3. 순번 변경\n");
+        printf("4. 책 제거\n");
+        printf("5. 책 읽음 표시\n");
+        printf("0. 종료\n");
+        printf("선택: ");
+        scanf("%d", &choice);
+        getchar();
+        switch (choice) {
+            case 1: printBooks(readingList); break;
+            case 2: addBook(); break;
+            case 3: changeOrder(); break;
+            case 4: removeOrder(); break;
+            case 5: markBookAsRead(); break;
+            case 0: return;
+            default: break;
+        }
+    }
+}
+
+void freeList(BookList **head) {
+    BookList *cur = *head;
+    while (cur) {
+        BookList *tmp = cur;
+        cur = cur->next;
+        free(tmp);
+    }
+    *head = NULL;
+}
+
+int main() {
+    doReadingList();
+    freeList(&readingList);
+    freeList(&readList);
+    return 0;
+}
