@@ -1,0 +1,301 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <ctype.h>
+
+#define MAX_WORD_LEN 20
+#define MAX_LINE_LEN 256
+#define MIN_WORD_COUNT 10
+#define MAX_WORD_COUNT 20
+#define MIN_WORD_LEN 2
+#define MAX_WORD_LEN_ALLOWED 7
+
+typedef struct WordNode {
+    char word[MAX_WORD_LEN];
+    int count;
+    struct WordNode *next;
+} WordNode;
+
+typedef struct Writing {
+    char **lines;
+    int lineCount;
+} Writing;
+
+char **wordPool = NULL;
+int wordPoolSize = 0;
+
+int loadWordPool(const char *filename) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0;
+    char line[MAX_WORD_LEN];
+    int count = 0;
+    while (fgets(line, sizeof(line), fp)) count++;
+    if (count == 0) {
+        fclose(fp);
+        return 0;
+    }
+    rewind(fp);
+    wordPool = (char **)malloc(sizeof(char *) * count);
+    if (!wordPool) {
+        fclose(fp);
+        return 0;
+    }
+    int idx = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        line[strcspn(line, "\r\n")] = 0;
+        wordPool[idx] = (char *)malloc(strlen(line) + 1);
+        strcpy(wordPool[idx], line);
+        idx++;
+    }
+    fclose(fp);
+    wordPoolSize = count;
+    return count;
+}
+
+int wordLengthInRange(const char *word, int minLen, int maxLen) {
+    int len = 0;
+    while (*word) {
+        if (!isspace((unsigned char)*word)) len++;
+        word++;
+    }
+    return (len >= minLen && len <= maxLen);
+}
+
+int selectRandomWords(int wordCount, int wordLenMin, int wordLenMax, char ***outWords) {
+    if (!wordPool || wordPoolSize == 0) return 0;
+    int *validIndices = (int *)malloc(sizeof(int)*wordPoolSize);
+    if (!validIndices) return 0;
+    int validCount = 0;
+    for (int i=0; i<wordPoolSize; i++)
+        if (wordLengthInRange(wordPool[i], wordLenMin, wordLenMax))
+            validIndices[validCount++] = i;
+    if (validCount < wordCount) {
+        free(validIndices);
+        return 0;
+    }
+    char **selected = (char **)malloc(sizeof(char *)*wordCount);
+    int *chosen = (int *)calloc(validCount, sizeof(int));
+    if (!selected || !chosen) {
+        free(validIndices);
+        free(selected);
+        free(chosen);
+        return 0;
+    }
+    int selectedCount = 0;
+    while (selectedCount < wordCount) {
+        int r = rand() % validCount;
+        if (!chosen[r]) {
+            chosen[r] = 1;
+            selected[selectedCount] = wordPool[validIndices[r]];
+            selectedCount++;
+        }
+    }
+    free(validIndices);
+    free(chosen);
+    *outWords = selected;
+    return wordCount;
+}
+
+void freeWordArray(char **arr, int size) {
+    if (!arr) return;
+    free(arr);
+}
+
+void printWords(char **words, int count) {
+    printf("제시된 단어 목록:\n");
+    for (int i=0; i<count; i++) printf("- %s\n", words[i]);
+    printf("\n");
+}
+
+WordNode *createWordNode(const char *word) {
+    WordNode *node = (WordNode *)malloc(sizeof(WordNode));
+    if (!node) return NULL;
+    strcpy(node->word, word);
+    node->count = 0;
+    node->next = NULL;
+    return node;
+}
+
+void addOrIncrementWord(WordNode **head, const char *word) {
+    WordNode *cur = *head;
+    while (cur) {
+        if (strcmp(cur->word, word) == 0) {
+            cur->count++;
+            return;
+        }
+        cur = cur->next;
+    }
+    WordNode *newNode = createWordNode(word);
+    if (!newNode) return;
+    newNode->count = 1;
+    newNode->next = *head;
+    *head = newNode;
+}
+
+void freeWordList(WordNode *head) {
+    while (head) {
+        WordNode *tmp = head;
+        head = head->next;
+        free(tmp);
+    }
+}
+
+int checkAllWordsUsed(WordNode *head, char **words, int count) {
+    for (int i=0; i<count; i++) {
+        WordNode *cur = head;
+        int found = 0;
+        while (cur) {
+            if (strcmp(cur->word, words[i]) == 0 && cur->count > 0) {
+                found = 1;
+                break;
+            }
+            cur = cur->next;
+        }
+        if (!found) return 0;
+    }
+    return 1;
+}
+
+void printWordUsage(WordNode *head) {
+    printf("사용된 단어 및 빈도:\n");
+    WordNode *cur = head;
+    while (cur) {
+        printf("%s: %d\n", cur->word, cur->count);
+        cur = cur->next;
+    }
+    printf("\n");
+}
+
+int countWordOccurrences(const char *line, const char *word) {
+    int count = 0;
+    const char *p = line;
+    int wlen = strlen(word);
+    while ((p = strstr(p, word)) != NULL) {
+        if ((p == line || !isalnum((unsigned char)*(p-1))) &&
+            !isalnum((unsigned char)*(p+wlen))) count++;
+        p += wlen;
+    }
+    return count;
+}
+
+void doCreativeWriting() {
+    if (!wordPool || wordPoolSize == 0) {
+        if (!loadWordPool("writing_words.txt")) {
+            printf("단어 풀 파일 로드 실패\n");
+            return;
+        }
+    }
+
+    int wordCount, wordLenMin, wordLenMax;
+    printf("사용할 단어 개수 입력(10~20): ");
+    scanf("%d", &wordCount);
+    while (wordCount < MIN_WORD_COUNT || wordCount > MAX_WORD_COUNT) {
+        printf("10에서 20 사이로 다시 입력: ");
+        scanf("%d", &wordCount);
+    }
+    printf("단어 글자 수 범위 입력(예: 2 7): ");
+    scanf("%d %d", &wordLenMin, &wordLenMax);
+    while (wordLenMin < MIN_WORD_LEN || wordLenMax > MAX_WORD_LEN_ALLOWED || wordLenMin > wordLenMax) {
+        printf("범위 오류, 다시 입력: ");
+        scanf("%d %d", &wordLenMin, &wordLenMax);
+    }
+
+    char **selectedWords = NULL;
+    if (!selectRandomWords(wordCount, wordLenMin, wordLenMax, &selectedWords)) {
+        printf("조건에 맞는 단어가 충분하지 않습니다.\n");
+        return;
+    }
+
+    printWords(selectedWords, wordCount);
+
+    Writing writing = {NULL, 0};
+    char inputLine[MAX_LINE_LEN];
+    WordNode *wordList = NULL;
+
+    while (1) {
+        printf("글쓰기를 시작합니다. 각 줄에 한 문장 입력 (줄 수는 %d 줄). 종료 후 빈 줄 입력:\n", wordCount);
+
+        if (writing.lines) {
+            for (int i=0; i<writing.lineCount; i++) free(writing.lines[i]);
+            free(writing.lines);
+            writing.lines = NULL;
+            writing.lineCount = 0;
+        }
+
+        writing.lines = (char **)malloc(sizeof(char *) * wordCount);
+        if (!writing.lines) {
+            printf("메모리 할당 실패\n");
+            freeWordArray(selectedWords, wordCount);
+            return;
+        }
+        int linesRead = 0;
+        getchar();
+        while (linesRead < wordCount) {
+            if (!fgets(inputLine, sizeof(inputLine), stdin)) break;
+            inputLine[strcspn(inputLine, "\r\n")] = 0;
+            if (strlen(inputLine) == 0) break;
+            writing.lines[linesRead] = strdup(inputLine);
+            if (!writing.lines[linesRead]) break;
+            linesRead++;
+        }
+        writing.lineCount = linesRead;
+
+        if (writing.lineCount != wordCount) {
+            printf("입력한 줄 수(%d)가 요구된 단어 개수(%d)와 일치하지 않습니다. 다시 작성하세요.\n", writing.lineCount, wordCount);
+            freeWordList(wordList);
+            wordList = NULL;
+            continue;
+        }
+
+        freeWordList(wordList);
+        wordList = NULL;
+        for (int i=0; i<wordCount; i++) {
+            addOrIncrementWord(&wordList, selectedWords[i]);
+            wordList->count = 0;
+        }
+
+        for (int i=0; i<writing.lineCount; i++) {
+            for (int w=0; w<wordCount; w++) {
+                int occ = countWordOccurrences(writing.lines[i], selectedWords[w]);
+                if (occ > 0) {
+                    addOrIncrementWord(&wordList, selectedWords[w]);
+                    WordNode *cur = wordList;
+                    while (cur) {
+                        if (strcmp(cur->word, selectedWords[w]) == 0) {
+                            cur->count += (occ - 1);
+                            break;
+                        }
+                        cur = cur->next;
+                    }
+                }
+            }
+        }
+
+        if (!checkAllWordsUsed(wordList, selectedWords, wordCount)) {
+            printf("모든 제시된 단어가 최소 한 번 이상 사용되지 않았습니다. 다시 작성하세요.\n");
+            printWordUsage(wordList);
+            continue;
+        }
+
+        FILE *fp = fopen("camelcase.txt", "w");
+        if (!fp) {
+            printf("파일 저장 실패\n");
+            freeWordList(wordList);
+            freeWordArray(selectedWords, wordCount);
+            for (int i=0; i<writing.lineCount; i++) free(writing.lines[i]);
+            free(writing.lines);
+            return;
+        }
+        for (int i=0; i<writing.lineCount; i++) fprintf(fp, "%s\n", writing.lines[i]);
+        fclose(fp);
+        printf("조건 만족, 글이 camelcase.txt에 저장되었습니다.\n");
+        printWordUsage(wordList);
+        break;
+    }
+
+    freeWordList(wordList);
+    freeWordArray(selectedWords, wordCount);
+    for (int i=0; i<writing.lineCount; i++) free(writing.lines[i]);
+    free(writing.lines);
+}
