@@ -1,0 +1,128 @@
+#ifndef DEBUT_H
+#define DEBUT_H
+void interactionMedia(void);
+#endif
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include "debut.h"
+
+#define MAX_MEDIA 10
+#define MAX_LINE 100
+#define MAX_NAME_LEN 50
+#define MAX_PARTICIPANTS 26
+
+static const char* mediaList[MAX_MEDIA] = {
+    "BBC", "JTBC", "KBS", "MBC", "MTN",
+    "SBS", "YTN", "오마이뉴스", "한겨례", "삼프로TV"
+};
+
+static char participants[MAX_PARTICIPANTS][MAX_NAME_LEN];
+static int participantCount = 0;
+
+static int charToIndex(char c) {
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    if (c >= 'a' && c <= 'z') return c - 'a';
+    return -1;
+}
+
+static void swapParticipants(int i, int j) {
+    char tmp[MAX_NAME_LEN];
+    strcpy(tmp, participants[i]);
+    strcpy(participants[i], participants[j]);
+    strcpy(participants[j], tmp);
+}
+
+static void loadParticipantsFromFile(const char* filename, int count) {
+    FILE* f = fopen(filename, "r");
+    if (!f) {
+        printf("연습생 정보 파일을 열 수 없습니다.\n");
+        exit(EXIT_FAILURE);
+    }
+    char line[MAX_LINE];
+    participantCount = 0;
+    while (fgets(line, sizeof(line), f)) {
+        if (participantCount >= count) break;
+        size_t len = strlen(line);
+        if (len > 0 && line[len-1] == '\n') line[len-1] = '\0';
+        if (strlen(line) > 0) {
+            strncpy(participants[participantCount], line, MAX_NAME_LEN-1);
+            participants[participantCount][MAX_NAME_LEN-1] = '\0';
+            participantCount++;
+        }
+    }
+    fclose(f);
+    if (participantCount < count) {
+        printf("파일 내 연습생 수가 부족합니다.\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+static void pickRandomParticipants(int count) {
+    for (int i = 0; i < participantCount - 1; i++) {
+        for (int j = i + 1; j < participantCount; j++) {
+            if (rand() % 2 == 0) {
+                swapParticipants(i, j);
+            }
+        }
+    }
+}
+
+void interactionMedia() {
+    srand((unsigned int)time(NULL));
+    int n;
+    printf("사다리 세로 줄 수를 입력하세요 (4~6): ");
+    if (scanf("%d", &n) != 1 || n < 4 || n > 6) {
+        printf("잘못된 입력입니다.\n");
+        return;
+    }
+    loadParticipantsFromFile("trainees.txt", 10);
+    pickRandomParticipants(participantCount);
+    char selectedParticipants[6][MAX_NAME_LEN];
+    for (int i = 0; i < n; i++) {
+        strcpy(selectedParticipants[i], participants[i]);
+    }
+    const char* selectedMedia[6];
+    for (int i = 0; i < n; i++) {
+        selectedMedia[i] = mediaList[rand() % MAX_MEDIA];
+    }
+    int ladderHeight;
+    printf("사다리 가로 줄 수를 입력하세요: ");
+    if (scanf("%d", &ladderHeight) != 1 || ladderHeight < 0) {
+        printf("잘못된 입력입니다.\n");
+        return;
+    }
+    int ladder[n][n];
+    for (int i = 0; i < ladderHeight; i++) {
+        char start, end;
+        printf("가로 줄 %d의 시작 세로 줄과 끝 세로 줄을 알파벳으로 입력하세요 (예: A B): ", i + 1);
+        if (scanf(" %c %c", &start, &end) != 2) {
+            printf("잘못된 입력입니다.\n");
+            return;
+        }
+        int si = charToIndex(start);
+        int ei = charToIndex(end);
+        if (si < 0 || ei < 0 || si >= n || ei >= n || abs(si - ei) != 1) {
+            printf("잘못된 세로 줄 알파벳입니다.\n");
+            return;
+        }
+        if (si > ei) { int tmp = si; si = ei; ei = tmp; }
+        ladder[i][0] = si;
+        ladder[i][1] = ei;
+    }
+    int pos[6];
+    for (int i = 0; i < n; i++) pos[i] = i;
+    for (int i = 0; i < ladderHeight; i++) {
+        int s = ladder[i][0];
+        int e = ladder[i][1];
+        int tmp = pos[s];
+        pos[s] = pos[e];
+        pos[e] = tmp;
+    }
+    printf("연습생 ID와 매칭된 미디어:\n");
+    for (int i = 0; i < n; i++) {
+        printf("%s -> %s\n", selectedParticipants[i], selectedMedia[pos[i]]);
+    }
+}
