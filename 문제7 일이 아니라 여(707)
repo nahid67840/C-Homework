@@ -1,0 +1,236 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_BUCKET_CONTENT_LEN 128
+#define INITIAL_BUCKET_CAPACITY 10
+#define QUEUE_CAPACITY 100
+
+typedef struct {
+    int id;
+    char content[MAX_BUCKET_CONTENT_LEN];
+} Bucket;
+
+typedef struct {
+    Bucket *array;
+    int size;
+    int capacity;
+} BucketList;
+
+typedef struct {
+    Bucket *queue[QUEUE_CAPACITY];
+    int front;
+    int rear;
+    int size;
+} CircularQueue;
+
+// --- BucketList functions ---
+int initBucketList(BucketList *bl) {
+    bl->array = malloc(sizeof(Bucket) * INITIAL_BUCKET_CAPACITY);
+    if (!bl->array) return 0;
+    bl->size = 0;
+    bl->capacity = INITIAL_BUCKET_CAPACITY;
+    return 1;
+}
+
+void freeBucketList(BucketList *bl) {
+    if (bl->array) free(bl->array);
+    bl->array = NULL;
+    bl->size = 0;
+    bl->capacity = 0;
+}
+
+int addBucket(BucketList *bl, int id, const char *content) {
+    if (bl->size >= bl->capacity) {
+        Bucket *tmp = realloc(bl->array, sizeof(Bucket) * (bl->capacity * 2));
+        if (!tmp) return 0;
+        bl->array = tmp;
+        bl->capacity *= 2;
+    }
+    bl->array[bl->size].id = id;
+    strncpy(bl->array[bl->size].content, content, MAX_BUCKET_CONTENT_LEN-1);
+    bl->array[bl->size].content[MAX_BUCKET_CONTENT_LEN-1] = '\0';
+    bl->size++;
+    return 1;
+}
+
+int loadBucketList(const char *filename, BucketList *bl) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0;
+    char line[256];
+    while (fgets(line, sizeof(line), fp)) {
+        int id;
+        char content[MAX_BUCKET_CONTENT_LEN];
+        char *ptr = strchr(line, ',');
+        if (!ptr) continue;
+        *ptr = '\0';
+        id = atoi(line);
+        // Trim newline if any
+        strncpy(content, ptr+1, MAX_BUCKET_CONTENT_LEN-1);
+        content[MAX_BUCKET_CONTENT_LEN-1] = '\0';
+        char *nl = strchr(content, '\n');
+        if (nl) *nl = '\0';
+        if (!addBucket(bl, id, content)) {
+            fclose(fp);
+            return 0;
+        }
+    }
+    fclose(fp);
+    return 1;
+}
+
+// --- CircularQueue functions ---
+void initQueue(CircularQueue *q) {
+    q->front = 0;
+    q->rear = 0;
+    q->size = 0;
+}
+
+int isQueueEmpty(CircularQueue *q) {
+    return q->size == 0;
+}
+
+int isQueueFull(CircularQueue *q) {
+    return q->size == QUEUE_CAPACITY;
+}
+
+int enqueue(CircularQueue *q, Bucket *b) {
+    if (isQueueFull(q)) return 0;
+    q->queue[q->rear] = b;
+    q->rear = (q->rear + 1) % QUEUE_CAPACITY;
+    q->size++;
+    return 1;
+}
+
+Bucket* dequeue(CircularQueue *q) {
+    if (isQueueEmpty(q)) return NULL;
+    Bucket *b = q->queue[q->front];
+    q->front = (q->front + 1) % QUEUE_CAPACITY;
+    q->size--;
+    return b;
+}
+
+// --- Utility functions ---
+void printBuckets(BucketList *bl) {
+    if (bl->size == 0) {
+        printf("남은 버킷 리스트가 없습니다.\n");
+        return;
+    }
+    printf("남은 버킷 리스트:\n");
+    for (int i = 0; i < bl->size; i++) {
+        printf("ID: %d - %s\n", bl->array[i].id, bl->array[i].content);
+    }
+}
+
+void printRealizedBuckets(CircularQueue *q) {
+    if (isQueueEmpty(q)) {
+        printf("실현한 버킷 리스트가 없습니다.\n");
+        return;
+    }
+    printf("실현한 버킷 리스트:\n");
+    int idx = q->front;
+    for (int i = 0; i < q->size; i++) {
+        Bucket *b = q->queue[idx];
+        printf("ID: %d - %s\n", b->id, b->content);
+        idx = (idx + 1) % QUEUE_CAPACITY;
+    }
+}
+
+// --- Search function (linear search, bonus) ---
+void searchBucketList(BucketList *bl, const char *keyword) {
+    int found = 0;
+    printf("검색어 '%s'로 검색 결과:\n", keyword);
+    for (int i = 0; i < bl->size; i++) {
+        char idStr[16];
+        sprintf(idStr, "%d", bl->array[i].id);
+        if (strstr(idStr, keyword) != NULL || strstr(bl->array[i].content, keyword) != NULL) {
+            printf("ID: %d - %s\n", bl->array[i].id, bl->array[i].content);
+            found = 1;
+        }
+    }
+    if (!found) {
+        printf("검색 결과가 없습니다.\n");
+    }
+}
+
+// --- Remove bucket from list by ID ---
+int removeBucketById(BucketList *bl, int id, Bucket *outBucket) {
+    for (int i = 0; i < bl->size; i++) {
+        if (bl->array[i].id == id) {
+            if (outBucket) *outBucket = bl->array[i];
+            // Shift left remaining elements
+            for (int j = i; j < bl->size - 1; j++) {
+                bl->array[j] = bl->array[j+1];
+            }
+            bl->size--;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// --- Main bucket list management function ---
+void makeBucketList() {
+    BucketList bucketList;
+    if (!initBucketList(&bucketList)) {
+        printf("메모리 할당 실패\n");
+        return;
+    }
+    if (!loadBucketList("bucketlist.csv", &bucketList)) {
+        printf("버킷 리스트 파일을 읽는데 실패했습니다.\n");
+        freeBucketList(&bucketList);
+        return;
+    }
+
+    CircularQueue realizedQueue;
+    initQueue(&realizedQueue);
+
+    char input[64];
+    while (bucketList.size > 0) {
+        printBuckets(&bucketList);
+        printRealizedBuckets(&realizedQueue);
+        printf("완료한 버킷 ID를 입력하세요 (종료는 'exit', 검색은 'search 키워드'): ");
+        if (!fgets(input, sizeof(input), stdin)) break;
+
+        // Remove trailing newline
+        char *nl = strchr(input, '\n');
+        if (nl) *nl = '\0';
+
+        if (strcmp(input, "exit") == 0) {
+            printf("버킷리스트 관리를 종료합니다.\n");
+            break;
+        } else if (strncmp(input, "search ", 7) == 0) {
+            const char *keyword = input + 7;
+            searchBucketList(&bucketList, keyword);
+            continue;
+        }
+
+        int id = atoi(input);
+        if (id == 0 && strcmp(input, "0") != 0) {
+            printf("잘못된 입력입니다.\n");
+            continue;
+        }
+        Bucket realized;
+        if (!removeBucketById(&bucketList, id, &realized)) {
+            printf("해당 ID의 버킷을 찾을 수 없습니다.\n");
+            continue;
+        }
+        if (!enqueue(&realizedQueue, malloc(sizeof(Bucket)))) {
+            printf("실현 버킷 큐가 가득 찼습니다.\n");
+            // 재삽입
+            addBucket(&bucketList, realized.id, realized.content);
+            continue;
+        }
+        // 큐의 마지막 위치에 넣기 위해 rear 바로 앞 위치 계산
+        int insertPos = (realizedQueue.rear == 0) ? QUEUE_CAPACITY - 1 : realizedQueue.rear - 1;
+        memcpy(realizedQueue.queue[insertPos], &realized, sizeof(Bucket));
+        printf("버킷 ID %d 완료 처리되었습니다.\n", id);
+    }
+
+    // 해제
+    for (int i = 0; i < realizedQueue.size; i++) {
+        int idx = (realizedQueue.front + i) % QUEUE_CAPACITY;
+        free(realizedQueue.queue[idx]);
+    }
+    freeBucketList(&bucketList);
+}
