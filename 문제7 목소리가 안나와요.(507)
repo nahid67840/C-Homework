@@ -1,0 +1,177 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#define MAX_ACTIVITIES 10
+#define MAX_DAYS 31
+#define MAX_WEEKS 5
+#define MAX_MONTHS 12
+
+typedef struct {
+    int id;
+    char description[128];
+    char condition[128];
+    char frequency[16]; // "daily" or "weekly"
+} ChecklistItem;
+
+typedef struct {
+    int completed[MAX_ACTIVITIES];
+    int day;
+    int month;
+    int year;
+} DailyChecklist;
+
+typedef struct {
+    DailyChecklist dailyLogs[MAX_DAYS];
+    int numDays;
+} MonthlyLog;
+
+typedef void (*ChecklistAction)(ChecklistItem*, int);
+
+int is_leap_year(int year) {
+    return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+}
+
+int get_days_in_month(int month, int year) {
+    int days_in_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    if (month == 2 && is_leap_year(year)) return 29;
+    return days_in_month[month - 1];
+}
+
+void initChecklist(ChecklistItem* checklist) {
+    strcpy(checklist[0].description, "아침 복부 호흡 연습");
+    strcpy(checklist[0].condition, "5 ~ 10분");
+    strcpy(checklist[0].frequency, "daily");
+
+    strcpy(checklist[1].description, "저녁 경구 호흡 연습");
+    strcpy(checklist[1].condition, "5 ~ 10분");
+    strcpy(checklist[1].frequency, "daily");
+
+    strcpy(checklist[2].description, "가볍고 부드러운 발성 연습");
+    strcpy(checklist[2].condition, "10 ~ 15분");
+    strcpy(checklist[2].frequency, "daily");
+
+    strcpy(checklist[3].description, "음의 높낮이와 음조 연습");
+    strcpy(checklist[3].condition, "10분");
+    strcpy(checklist[3].frequency, "daily");
+
+    strcpy(checklist[4].description, "발음과 억양 연습");
+    strcpy(checklist[4].condition, "10분");
+    strcpy(checklist[4].frequency, "daily");
+
+    strcpy(checklist[5].description, "목소리에 부담되는 활동 피하기");
+    strcpy(checklist[5].condition, "5가지 조건 중 하나라도 해당 시 완료");
+    strcpy(checklist[5].frequency, "daily");
+
+    strcpy(checklist[6].description, "충분히 물 마시기");
+    strcpy(checklist[6].condition, "8잔");
+    strcpy(checklist[6].frequency, "daily");
+
+    strcpy(checklist[7].description, "적절한 습도 유지하기");
+    strcpy(checklist[7].condition, "40% ~ 60%");
+    strcpy(checklist[7].frequency, "daily");
+
+    strcpy(checklist[8].description, "목소리 사용 후 적당한 휴식");
+    strcpy(checklist[8].condition, "30분 이상");
+    strcpy(checklist[8].frequency, "daily");
+
+    strcpy(checklist[9].description, "전문 보컬 튜터와 레슨 또는 상담");
+    strcpy(checklist[9].condition, "1회");
+    strcpy(checklist[9].frequency, "weekly");
+
+    for (int i = 0; i < MAX_ACTIVITIES; i++) {
+        checklist[i].id = i + 1;
+    }
+}
+
+void inputDailyChecklist(DailyChecklist* log, ChecklistItem* checklist) {
+    printf("날짜 입력 (일): ");
+    scanf("%d", &log->day);
+    printf("월 입력: ");
+    scanf("%d", &log->month);
+    printf("연도 입력: ");
+    scanf("%d", &log->year);
+
+    for (int i = 0; i < MAX_ACTIVITIES; i++) {
+        printf("%d. %s (%s, %s) 완료했나요? (1=예, 0=아니오): ",
+               checklist[i].id,
+               checklist[i].description,
+               checklist[i].condition,
+               checklist[i].frequency);
+        scanf("%d", &log->completed[i]);
+    }
+}
+
+void calculateWeeklyStats(MonthlyLog* monthLog, ChecklistItem* checklist) {
+    int weekCount = 0;
+    int totalCompleted[MAX_ACTIVITIES] = {0};
+
+    for (int i = 0; i < monthLog->numDays && weekCount < 7; i++) {
+        for (int j = 0; j < MAX_ACTIVITIES; j++) {
+            totalCompleted[j] += monthLog->dailyLogs[i].completed[j];
+        }
+        weekCount++;
+    }
+
+    if (weekCount < 7) {
+        printf("주간 통계를 내기엔 데이터가 부족합니다.\n");
+        return;
+    }
+
+    printf("[주간 통계]\n");
+    for (int i = 0; i < MAX_ACTIVITIES; i++) {
+        printf("%d. %s 완료율: %.2f%%\n",
+               checklist[i].id,
+               checklist[i].description,
+               (totalCompleted[i] / 7.0) * 100);
+    }
+}
+
+void calculateMonthlyStats(MonthlyLog* monthLog, ChecklistItem* checklist) {
+    int totalCompleted[MAX_ACTIVITIES] = {0};
+    int totalDays = monthLog->numDays;
+
+    if (totalDays < 28) {
+        printf("월간 통계를 내기엔 데이터가 부족합니다.\n");
+        return;
+    }
+
+    for (int i = 0; i < totalDays; i++) {
+        for (int j = 0; j < MAX_ACTIVITIES; j++) {
+            totalCompleted[j] += monthLog->dailyLogs[i].completed[j];
+        }
+    }
+
+    printf("[월간 통계]\n");
+    for (int i = 0; i < MAX_ACTIVITIES; i++) {
+        printf("%d. %s 완료율: %.2f%%\n",
+               checklist[i].id,
+               checklist[i].description,
+               (totalCompleted[i] / (float)totalDays) * 100);
+    }
+}
+
+void checkList4VocalHealth() {
+    ChecklistItem checklist[MAX_ACTIVITIES];
+    MonthlyLog monthlyLogs[MAX_MONTHS] = {0};
+    int currentMonth;
+
+    initChecklist(checklist);
+
+    printf("현재 월 입력 (1~12): ");
+    scanf("%d", &currentMonth);
+
+    int currentIndex = monthlyLogs[currentMonth - 1].numDays;
+    inputDailyChecklist(&monthlyLogs[currentMonth - 1].dailyLogs[currentIndex], checklist);
+    monthlyLogs[currentMonth - 1].numDays++;
+
+    int option;
+    printf("1. 주간 통계\n2. 월간 통계\n선택: ");
+    scanf("%d", &option);
+
+    if (option == 1) {
+        calculateWeeklyStats(&monthlyLogs[currentMonth - 1], checklist);
+    } else if (option == 2) {
+        calculateMonthlyStats(&monthlyLogs[currentMonth - 1], checklist);
+    }
+}
