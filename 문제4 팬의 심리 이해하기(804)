@@ -1,0 +1,144 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_PSYCHOLOGY_LEN 50
+#define MAX_DESC_LEN 256
+#define MAX_ITEMS 6
+#define REPORT_FILE "psychology_report.txt"
+
+typedef struct PsychologyNode {
+    char psychology[MAX_PSYCHOLOGY_LEN];
+    char description[MAX_DESC_LEN];
+    struct PsychologyNode *next;
+} PsychologyNode;
+
+typedef struct {
+    PsychologyNode *front;
+    PsychologyNode *rear;
+    int size;
+} Queue;
+
+void initQueue(Queue *q) {
+    q->front = q->rear = NULL;
+    q->size = 0;
+}
+
+int isEmpty(Queue *q) {
+    return q->front == NULL;
+}
+
+void enqueue(Queue *q, const char *psychology, const char *desc) {
+    PsychologyNode *node = malloc(sizeof(PsychologyNode));
+    if (!node) return;
+    strncpy(node->psychology, psychology, MAX_PSYCHOLOGY_LEN - 1);
+    node->psychology[MAX_PSYCHOLOGY_LEN - 1] = '\0';
+    strncpy(node->description, desc, MAX_DESC_LEN - 1);
+    node->description[MAX_DESC_LEN - 1] = '\0';
+    node->next = NULL;
+    if (q->rear == NULL) {
+        q->front = q->rear = node;
+    } else {
+        q->rear->next = node;
+        q->rear = node;
+    }
+    q->size++;
+}
+
+PsychologyNode *dequeue(Queue *q) {
+    if (isEmpty(q)) return NULL;
+    PsychologyNode *node = q->front;
+    q->front = node->next;
+    if (q->front == NULL) q->rear = NULL;
+    q->size--;
+    return node;
+}
+
+void freeQueue(Queue *q) {
+    PsychologyNode *cur = q->front;
+    while (cur) {
+        PsychologyNode *tmp = cur;
+        cur = cur->next;
+        free(tmp);
+    }
+    q->front = q->rear = NULL;
+    q->size = 0;
+}
+
+int loadPsychologyList(const char *filename, PsychologyNode arr[], int max) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0;
+    int count = 0;
+    char line[512];
+    while (count < max && fgets(line, sizeof(line), fp)) {
+        char *psych = strtok(line, ",");
+        char *desc = strtok(NULL, "\r\n");
+        if (!psych || !desc) continue;
+        strncpy(arr[count].psychology, psych, MAX_PSYCHOLOGY_LEN - 1);
+        arr[count].psychology[MAX_PSYCHOLOGY_LEN - 1] = '\0';
+        strncpy(arr[count].description, desc, MAX_DESC_LEN - 1);
+        arr[count].description[MAX_DESC_LEN - 1] = '\0';
+        count++;
+    }
+    fclose(fp);
+    return count;
+}
+
+void printPsychologyList(PsychologyNode arr[], int count) {
+    printf("팬 심리 목록:\n");
+    for (int i = 0; i < count; i++) {
+        printf("%d. %s\n   %s\n", i + 1, arr[i].psychology, arr[i].description);
+    }
+}
+
+void saveReport(const char *filename, Queue *q) {
+    FILE *fp = fopen(filename, "w");
+    if (!fp) return;
+    PsychologyNode *cur = q->front;
+    while (cur) {
+        fprintf(fp, "%s: %s\n", cur->psychology, cur->description);
+        cur = cur->next;
+    }
+    fclose(fp);
+}
+
+void printReport(const char *filename) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return;
+    char line[512];
+    while (fgets(line, sizeof(line), fp)) {
+        printf("%s", line);
+    }
+    fclose(fp);
+}
+
+void analyzFanPsychology() {
+    PsychologyNode psychologyList[MAX_ITEMS];
+    int count = loadPsychologyList("psychology.txt", psychologyList, MAX_ITEMS);
+    if (count == 0) return;
+    Queue q;
+    initQueue(&q);
+    while (1) {
+        printPsychologyList(psychologyList, count);
+        printf("대응 우선순위가 높은 팬 심리(번호) 선택 (0 종료): ");
+        int sel;
+        if (scanf("%d", &sel) != 1) {
+            while(getchar() != '\n');
+            continue;
+        }
+        if (sel == 0) break;
+        if (sel < 1 || sel > count) continue;
+        enqueue(&q, psychologyList[sel - 1].psychology, psychologyList[sel - 1].description);
+        if (q.size >= MAX_ITEMS) {
+            saveReport(REPORT_FILE, &q);
+            printReport(REPORT_FILE);
+            freeQueue(&q);
+            initQueue(&q);
+        }
+    }
+    if (q.size > 0) {
+        saveReport(REPORT_FILE, &q);
+        printReport(REPORT_FILE);
+        freeQueue(&q);
+    }
+}
