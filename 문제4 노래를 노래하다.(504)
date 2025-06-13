@@ -1,0 +1,140 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define MAX_SONGS 10
+#define MAX_INPUT 100
+
+typedef struct {
+    char title[50];
+    char artist[50];
+    char genre[30];
+} Song;
+
+Song songs[MAX_SONGS] = {
+    {"Call Me Baby", "EXO", "댄스 팝"},
+    {"Through the Night", "IU", "발라드"},
+    {"Mic Drop", "BTS", "힙합"},
+    {"Eyes, Nose, Lips", "Taeyang", "R&B"},
+    {"Shoot Me", "Day6", "록(Rock)"},
+    {"Electric Shock", "f(x)", "일렉트로니카"},
+    {"Love Tonight", "홍진영", "트로트"},
+    {"Island", "WINNER", "레게"},
+    {"Dumb Litty", "KARD", "퓨전"},
+    {"I'm Sorry", "CNBLUE", "밴드"}
+};
+
+const char* genres[10] = {
+    "댄스 팝", "발라드", "힙합", "R&B", "록(Rock)",
+    "일렉트로니카", "트로트", "레게", "퓨전", "밴드"
+};
+
+void showHint(const char *artist) {
+    int len = strlen(artist);
+    if (len <= 3)
+        printf("힌트: %c\n", artist[0]);
+    else if (len <= 5)
+        printf("힌트: %.2s\n", artist);
+    else
+        printf("힌트: %.3s\n", artist);
+}
+
+void learnSongGenre() {
+    srand(time(NULL));
+    int idx = rand() % MAX_SONGS;
+    Song song = songs[idx];
+    char input[MAX_INPUT];
+    int attempts = 2;
+
+    printf("\n노래 제목: %s\n", song.title);
+
+    while (attempts--) {
+        printf("장르를 입력하세요 (힌트는 'hint' 입력): ");
+        fgets(input, sizeof(input), stdin);
+        input[strcspn(input, "\n")] = 0;
+
+        if (strcmp(input, "hint") == 0) {
+            showHint(song.artist);
+            attempts++;
+            continue;
+        }
+
+        if (strcmp(input, song.genre) == 0) {
+            printf("정답입니다! 축하합니다 🎉\n");
+            return;
+        } else {
+            printf("틀렸습니다.\n");
+        }
+    }
+
+    printf("아쉽네요. 정답은 '%s'였습니다.\n", song.genre);
+}
+
+void shuffle(int *arr, int n) {
+    for (int i = 0; i < n; i++) {
+        int r = rand() % n;
+        int temp = arr[i];
+        arr[i] = arr[r];
+        arr[r] = temp;
+    }
+}
+
+void matchSongsAndGenres() {
+    srand(time(NULL));
+    int songIdx[MAX_SONGS], genreIdx[MAX_SONGS];
+    for (int i = 0; i < MAX_SONGS; i++) {
+        songIdx[i] = i;
+        genreIdx[i] = i;
+    }
+
+    shuffle(songIdx, MAX_SONGS);
+    shuffle(genreIdx, MAX_SONGS);
+
+    printf("\n-- 노래 목록 --\n");
+    for (int i = 0; i < MAX_SONGS; i++)
+        printf("%d. %s\n", i + 1, songs[songIdx[i]].title);
+
+    printf("\n-- 장르 목록 --\n");
+    for (int i = 0; i < MAX_SONGS; i++)
+        printf("%d. %s\n", i + 1, genres[genreIdx[i]]);
+
+    int match[MAX_SONGS];
+    for (int i = 0; i < MAX_SONGS; i++) {
+        printf("%s의 장르 번호를 입력하세요: ", songs[songIdx[i]].title);
+        scanf("%d", &match[i]);
+    }
+
+    int correct = 0;
+    printf("\n-- 결과 --\n");
+    for (int i = 0; i < MAX_SONGS; i++) {
+        int genreIndex = genreIdx[match[i] - 1];
+        if (strcmp(songs[songIdx[i]].genre, genres[genreIndex]) == 0) {
+            printf("[O] %s - %s\n", songs[songIdx[i]].title, genres[genreIndex]);
+            correct++;
+        } else {
+            printf("[X] %s - %s (정답: %s)\n", songs[songIdx[i]].title, genres[genreIndex], songs[songIdx[i]].genre);
+        }
+    }
+
+    printf("\n총 %d개 정답!\n", correct);
+}
+
+void showStage4Menu() {
+    int choice;
+    do {
+        printf("\n[II. 훈련 > 4. 보컬 훈련 > D. 장르 학습]\n");
+        printf("1. 장르 퀴즈\n");
+        printf("2. 보너스 게임 (노래-장르 매칭)\n");
+        printf("0. 상위 메뉴로\n");
+        printf("선택: ");
+        scanf("%d%*c", &choice);
+
+        switch (choice) {
+            case 1: learnSongGenre(); break;
+            case 2: matchSongsAndGenres(); break;
+            case 0: break;
+            default: printf("잘못된 입력입니다.\n");
+        }
+    } while (choice != 0);
+}
