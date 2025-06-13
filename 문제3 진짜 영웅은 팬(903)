@@ -1,0 +1,169 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_NAME 100
+#define TABLE_SIZE 101
+
+typedef struct Member {
+    char name[MAX_NAME];
+    int age;
+    char gender;
+    struct Member* next;
+} Member;
+
+Member* hashTable[TABLE_SIZE];
+
+unsigned int hash(const char* key) {
+    unsigned int hashVal = 0;
+    while (*key) hashVal = (hashVal * 31 + *key++) % TABLE_SIZE;
+    return hashVal;
+}
+
+void initHashTable(void) {
+    for (int i = 0; i < TABLE_SIZE; i++) hashTable[i] = NULL;
+}
+
+void addMember(const char* name, int age, char gender) {
+    unsigned int index = hash(name);
+    Member* newMember = (Member*)malloc(sizeof(Member));
+    strcpy(newMember->name, name);
+    newMember->age = age;
+    newMember->gender = gender;
+    newMember->next = hashTable[index];
+    hashTable[index] = newMember;
+}
+
+Member* searchMember(const char* name) {
+    unsigned int index = hash(name);
+    Member* current = hashTable[index];
+    while (current) {
+        if (strcmp(current->name, name) == 0) return current;
+        current = current->next;
+    }
+    return NULL;
+}
+
+void deleteMember(const char* name) {
+    unsigned int index = hash(name);
+    Member* current = hashTable[index];
+    Member* prev = NULL;
+    while (current) {
+        if (strcmp(current->name, name) == 0) {
+            if (prev) prev->next = current->next;
+            else hashTable[index] = current->next;
+            free(current);
+            return;
+        }
+        prev = current;
+        current = current->next;
+    }
+}
+
+void updateMember(const char* name, int age, char gender) {
+    Member* member = searchMember(name);
+    if (member) {
+        member->age = age;
+        member->gender = gender;
+    }
+}
+
+void printAllMembers(void) {
+    for (int i = 0; i < TABLE_SIZE; i++) {
+        Member* current = hashTable[i];
+        while (current) {
+            printf("Name: %s, Age: %d, Gender: %c\n", current->name, current->age, current->gender);
+            current = current->next;
+        }
+    }
+}
+
+void loadMembersFromFile(const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (!file) return;
+    char name[MAX_NAME];
+    int age;
+    char gender;
+    while (fscanf(file, "%s %d %c", name, &age, &gender) == 3) {
+        addMember(name, age, gender);
+    }
+    fclose(file);
+}
+
+void saveMembersToFile(const char* filename) {
+    FILE* file = fopen(filename, "w");
+    if (!file) return;
+    for (int i = 0; i < TABLE_SIZE; i++) {
+        Member* current = hashTable[i];
+        while (current) {
+            fprintf(file, "%s %d %c\n", current->name, current->age, current->gender);
+            current = current->next;
+        }
+    }
+    fclose(file);
+}
+
+void adminFanClub(void) {
+    int choice;
+    char name[MAX_NAME];
+    int age;
+    char gender;
+    initHashTable();
+    loadMembersFromFile("members.txt");
+    do {
+        printf("\n[Fan Club Management]\n");
+        printf("1. Add Member\n");
+        printf("2. Search Member\n");
+        printf("3. Delete Member\n");
+        printf("4. Update Member\n");
+        printf("5. Print All Members\n");
+        printf("0. Save and Exit\n");
+        printf("Select: ");
+        scanf("%d", &choice);
+        switch (choice) {
+            case 1:
+                printf("Name: "); scanf("%s", name);
+                printf("Age: "); scanf("%d", &age);
+                printf("Gender (M/F): "); scanf(" %c", &gender);
+                addMember(name, age, gender);
+                break;
+            case 2:
+                printf("Name: "); scanf("%s", name);
+                {
+                    Member* found = searchMember(name);
+                    if (found) printf("Found - Name: %s, Age: %d, Gender: %c\n", found->name, found->age, found->gender);
+                    else printf("Member not found.\n");
+                }
+                break;
+            case 3:
+                printf("Name: "); scanf("%s", name);
+                deleteMember(name);
+                break;
+            case 4:
+                printf("Name: "); scanf("%s", name);
+                printf("New Age: "); scanf("%d", &age);
+                printf("New Gender (M/F): "); scanf(" %c", &gender);
+                updateMember(name, age, gender);
+                break;
+            case 5:
+                printAllMembers();
+                break;
+            case 0:
+                saveMembersToFile("members.txt");
+                break;
+        }
+    } while (choice != 0);
+}
+
+int main() {
+    int choice;
+    do {
+        printf("\n[Main Menu]\n");
+        printf("1. Fan Club Management\n");
+        printf("0. Exit\n");
+        printf("Select: ");
+        scanf("%d", &choice);
+        if (choice == 1) adminFanClub();
+    } while (choice != 0);
+    return 0;
+}
