@@ -1,0 +1,183 @@
+// debut.h
+#ifndef DEBUT_H
+#define DEBUT_H
+
+#define FAN_COUNT 500
+#define K 3
+
+typedef enum {
+    FAN_GENUINE = 0,
+    FAN_FAKE = 1,
+    FAN_ANTI = 2
+} FanType;
+
+typedef struct {
+    int id;
+    FanType trueType;
+    double features[2];
+    int cluster;
+} Fan;
+
+void classifyFan(void);
+
+#endif
+
+// debut.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <math.h>
+#include "debut.h"
+
+static double distance(double a[2], double b[2]) {
+    double dx = a[0] - b[0];
+    double dy = a[1] - b[1];
+    return sqrt(dx*dx + dy*dy);
+}
+
+static void printFanType(FanType t) {
+    switch(t) {
+        case FAN_GENUINE: printf("찐팬"); break;
+        case FAN_FAKE: printf("가짜팬"); break;
+        case FAN_ANTI: printf("안티팬"); break;
+        default: printf("알수없음"); break;
+    }
+}
+
+static void printClusterType(int c) {
+    switch(c) {
+        case 0: printf("찐팬 클러스터"); break;
+        case 1: printf("가짜팬 클러스터"); break;
+        case 2: printf("안티팬 클러스터"); break;
+        default: printf("알수없음 클러스터"); break;
+    }
+}
+
+void classifyFan(void) {
+    Fan fans[FAN_COUNT];
+    srand((unsigned int)time(NULL));
+    for (int i = 0; i < FAN_COUNT; i++) {
+        fans[i].id = i + 1;
+        fans[i].trueType = rand() % K;
+        switch(fans[i].trueType) {
+            case FAN_GENUINE:
+                fans[i].features[0] = 70 + rand() % 31;
+                fans[i].features[1] = 70 + rand() % 31;
+                break;
+            case FAN_FAKE:
+                fans[i].features[0] = 30 + rand() % 41;
+                fans[i].features[1] = 30 + rand() % 41;
+                break;
+            case FAN_ANTI:
+                fans[i].features[0] = rand() % 31;
+                fans[i].features[1] = rand() % 31;
+                break;
+        }
+        fans[i].cluster = -1;
+    }
+    double centroids[K][2];
+    for (int i = 0; i < K; i++) {
+        centroids[i][0] = fans[i].features[0];
+        centroids[i][1] = fans[i].features[1];
+    }
+    int changed, iter=0;
+    do {
+        changed = 0;
+        for (int i = 0; i < FAN_COUNT; i++) {
+            double minDist = distance(fans[i].features, centroids[0]);
+            int minIdx = 0;
+            for (int c = 1; c < K; c++) {
+                double dist = distance(fans[i].features, centroids[c]);
+                if (dist < minDist) {
+                    minDist = dist;
+                    minIdx = c;
+                }
+            }
+            if (fans[i].cluster != minIdx) {
+                fans[i].cluster = minIdx;
+                changed = 1;
+            }
+        }
+        double sum[K][2] = {{0}};
+        int count[K] = {0};
+        for (int i = 0; i < FAN_COUNT; i++) {
+            int c = fans[i].cluster;
+            sum[c][0] += fans[i].features[0];
+            sum[c][1] += fans[i].features[1];
+            count[c]++;
+        }
+        for (int c = 0; c < K; c++) {
+            if (count[c] > 0) {
+                centroids[c][0] = sum[c][0] / count[c];
+                centroids[c][1] = sum[c][1] / count[c];
+            }
+        }
+        iter++;
+        if (iter > 100) break;
+    } while (changed);
+    printf("[팬별 클러스터 할당 결과]\n");
+    printf("팬ID | 팬유형 | 클러스터\n");
+    printf("-------------------------\n");
+    for (int i = 0; i < FAN_COUNT; i++) {
+        printf("%4d | ", fans[i].id);
+        printFanType(fans[i].trueType);
+        printf(" | ");
+        printClusterType(fans[i].cluster);
+        printf("\n");
+    }
+    printf("\n[클러스터별 팬 목록]\n");
+    for (int c = 0; c < K; c++) {
+        printClusterType(c);
+        printf(" 팬 목록: ");
+        int first = 1;
+        for (int i = 0; i < FAN_COUNT; i++) {
+            if (fans[i].cluster == c) {
+                if (!first) printf(", ");
+                printf("%d", fans[i].id);
+                first = 0;
+            }
+        }
+        printf("\n");
+    }
+}
+
+// menu.c
+#include <stdio.h>
+#include "debut.h"
+
+void showMenu(void) {
+    int choice;
+    do {
+        printf("\n[III. 데뷔 > 팬 분류]\n");
+        printf("1. 팬 유형 분류 (K-means 클러스터링)\n");
+        printf("0. 종료\n");
+        printf("선택: ");
+        if (scanf("%d", &choice) != 1) {
+            while(getchar() != '\n');
+            printf("잘못된 입력\n");
+            continue;
+        }
+        while(getchar() != '\n');
+        switch(choice) {
+            case 1:
+                classifyFan();
+                break;
+            case 0:
+                printf("프로그램 종료\n");
+                break;
+            default:
+                printf("잘못된 선택\n");
+        }
+    } while(choice != 0);
+}
+
+// magrathea.c
+#include <stdio.h>
+
+void showMenu(void);
+
+int main(void) {
+    printf("=== 아이돌 연습생 데뷔 시뮬레이션 ===\n");
+    showMenu();
+    return 0;
+}
