@@ -1,0 +1,120 @@
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+#include <ctype.h>
+
+#define MAX_MEMBERS 7
+#define MAX_NICK_LEN 20
+#define MAX_NAME_LEN 20
+#define MAX_ANSWER_LEN 51
+#define MIN_ANSWER_LEN 20
+#define DATE_LEN 11
+#define NUM_QUESTIONS 3
+
+typedef struct {
+    char name[MAX_NAME_LEN];
+    char nickname[MAX_NICK_LEN];
+} Member;
+
+typedef struct {
+    char name[MAX_NAME_LEN];
+    char date[DATE_LEN];
+    char achievements[MAX_ANSWER_LEN];
+    char difficulties[MAX_ANSWER_LEN];
+    char plans[MAX_ANSWER_LEN];
+} DailyReflection;
+
+const Member members[MAX_MEMBERS] = {
+    {"김영진", "YoungJin"},
+    {"이지훈", "JiHoon"},
+    {"박찬호", "ChanHo"},
+    {"최수민", "SooMin"},
+    {"이민재", "MinJae"},
+    {"강현우", "HyunWoo"},
+    {"송재현", "JaeHyun"}
+};
+
+const char questions[NUM_QUESTIONS][100] = {
+    "오늘 어떤 성취를 이뤘나?",
+    "어떤 어려움을 극복했나?",
+    "내일은 어떤 계획을 세울까?"
+};
+
+void getTodayDate(char *buffer, int size) {
+    time_t t = time(NULL);
+    struct tm *tm_info = localtime(&t);
+    snprintf(buffer, size, "%04d-%02d-%02d",
+        tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday);
+}
+
+int inputAnswer(const char *question, char *answer) {
+    char buf[100];
+    while(1) {
+        printf("%s\n", question);
+        if(fgets(buf, sizeof(buf), stdin) == NULL) return 0;
+        buf[strcspn(buf, "\n")] = 0;
+        int len = (int)strlen(buf);
+        if(len < MIN_ANSWER_LEN) {
+            printf("입력은 최소 20자 이상이어야 합니다. 다시 입력하세요.\n");
+            continue;
+        }
+        if(len >= MAX_ANSWER_LEN) {
+            printf("입력이 너무 깁니다. 50자 이하로 입력하세요.\n");
+            continue;
+        }
+        strcpy(answer, buf);
+        return 1;
+    }
+}
+
+int countNonSpace(const char *str) {
+    int count = 0;
+    for(int i = 0; str[i]; i++) {
+        if(!isspace((unsigned char)str[i])) count++;
+    }
+    return count;
+}
+
+void displayReflection(const DailyReflection *ref) {
+    const char *answers[NUM_QUESTIONS] = {ref->achievements, ref->difficulties, ref->plans};
+    int order[NUM_QUESTIONS] = {0,1,2};
+    for(int i=0; i<NUM_QUESTIONS-1; i++) {
+        for(int j=i+1; j<NUM_QUESTIONS; j++) {
+            if(countNonSpace(answers[order[i]]) < countNonSpace(answers[order[j]])) {
+                int tmp = order[i];
+                order[i] = order[j];
+                order[j] = tmp;
+            }
+        }
+    }
+    printf("%s 님의 자기 성찰 결과 (날짜: %s)\n", ref->name, ref->date);
+    for(int i=0; i<NUM_QUESTIONS; i++) {
+        printf("%s\n", questions[order[i]]);
+        printf("%s\n", answers[order[i]]);
+    }
+}
+
+void inputReflection(DailyReflection *ref) {
+    getTodayDate(ref->date, DATE_LEN);
+    for(int i=0; i<NUM_QUESTIONS; i++) {
+        if(!inputAnswer(questions[i], 
+            (i==0) ? ref->achievements : (i==1) ? ref->difficulties : ref->plans)) return;
+    }
+}
+
+void doSelfReflection() {
+    int sel = -1;
+    printf("멤버 목록:\n");
+    for(int i=0; i<MAX_MEMBERS; i++) {
+        printf("%d. %s (%s)\n", i+1, members[i].name, members[i].nickname);
+    }
+    printf("멤버 선택: ");
+    if(scanf("%d%*c", &sel) != 1 || sel < 1 || sel > MAX_MEMBERS) {
+        printf("잘못된 선택입니다.\n");
+        return;
+    }
+    DailyReflection ref;
+    strcpy(ref.name, members[sel-1].nickname);
+    inputReflection(&ref);
+    displayReflection(&ref);
+}
