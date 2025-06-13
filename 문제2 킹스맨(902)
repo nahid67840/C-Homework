@@ -1,0 +1,143 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_LINE_LEN 256
+#define MAX_EXPRS 20
+#define MAX_RESULTS 100
+
+typedef struct {
+    int lineNumber;
+    char lineText[MAX_LINE_LEN];
+} Result;
+
+typedef struct {
+    char *expressions[MAX_EXPRS];
+    int count;
+} ConcernList;
+
+void initConcernList(ConcernList *list) {
+    static char *phrases[] = {
+        "항상", "절대", "모든 사람", "모든 것", "대부분", "상당수",
+        "가끔", "종종", "아마도", "아마", "정확하지는 않지만",
+        "싫지는 않지만", "찐이야", "버려"
+    };
+    list->count = sizeof(phrases) / sizeof(phrases[0]);
+    for (int i = 0; i < list->count; ++i) {
+        list->expressions[i] = phrases[i];
+    }
+}
+
+// KMP 알고리즘
+void computeLPSArray(char *pat, int M, int *lps) {
+    int len = 0;
+    lps[0] = 0;
+    int i = 1;
+    while (i < M) {
+        if (pat[i] == pat[len]) {
+            lps[i++] = ++len;
+        } else if (len != 0) {
+            len = lps[len - 1];
+        } else {
+            lps[i++] = 0;
+        }
+    }
+}
+
+int KMPSearch(char *pat, char *txt) {
+    int M = strlen(pat);
+    int N = strlen(txt);
+    int lps[M];
+    computeLPSArray(pat, M, lps);
+
+    int i = 0, j = 0;
+    while (i < N) {
+        if (pat[j] == txt[i]) {
+            i++;
+            j++;
+        }
+        if (j == M) return 1; // 발견됨
+        else if (i < N && pat[j] != txt[i]) {
+            if (j != 0) j = lps[j - 1];
+            else i++;
+        }
+    }
+    return 0; // 발견 안됨
+}
+
+// Brute-Force 알고리즘 (보너스)
+int BruteForceSearch(char *pat, char *txt) {
+    int M = strlen(pat);
+    int N = strlen(txt);
+    for (int i = 0; i <= N - M; ++i) {
+        int j = 0;
+        while (j < M && txt[i + j] == pat[j]) j++;
+        if (j == M) return 1;
+    }
+    return 0;
+}
+
+// 결과 출력
+void printResults(Result results[], int count) {
+    if (count == 0) {
+        printf("문제가 되는 문장이 발견되지 않았습니다.\n");
+        return;
+    }
+
+    printf("===== 문제 문장 탐지 결과 =====\n");
+    for (int i = 0; i < count; ++i) {
+        printf("[Line %d]: %s", results[i].lineNumber, results[i].lineText);
+    }
+    printf("================================\n");
+}
+
+// 파일 분석 함수 (KMP 또는 Brute-force 사용)
+void analyzeFile(const char *filename, ConcernList *list, Result results[], int *resultCount, int useBruteForce) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) {
+        perror("파일 열기 실패");
+        exit(EXIT_FAILURE);
+    }
+
+    char line[MAX_LINE_LEN];
+    int lineNumber = 0;
+    *resultCount = 0;
+
+    while (fgets(line, sizeof(line), fp)) {
+        ++lineNumber;
+        for (int i = 0; i < list->count; ++i) {
+            int found = useBruteForce ?
+                        BruteForceSearch(list->expressions[i], line) :
+                        KMPSearch(list->expressions[i], line);
+
+            if (found) {
+                results[*resultCount].lineNumber = lineNumber;
+                strncpy(results[*resultCount].lineText, line, MAX_LINE_LEN);
+                (*resultCount)++;
+                break; // 한 줄에 한 번만 감지
+            }
+        }
+    }
+
+    fclose(fp);
+}
+
+// 메인 기능 함수
+void writingManners() {
+    ConcernList list;
+    Result results[MAX_RESULTS];
+    int resultCount;
+    int choice;
+
+    initConcernList(&list);
+
+    printf("사용할 문자열 탐색 알고리즘을 선택하세요:\n");
+    printf("1. KMP 알고리즘 (권장)\n");
+    printf("2. Brute-Force 알고리즘 (비교용)\n");
+    printf("선택: ");
+    scanf("%d", &choice);
+    getchar(); 
+
+    analyzeFile("social_post.txt", &list, results, &resultCount, choice == 2);
+    printResults(results, resultCount);
+}
