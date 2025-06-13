@@ -1,0 +1,82 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_WORD 100
+#define MAX_LINE 1024
+#define MAX_KEYWORDS 100
+
+char badWords[MAX_KEYWORDS][MAX_WORD];
+char goodWords[MAX_KEYWORDS][MAX_WORD];
+int badCount = 0;
+int goodCount = 0;
+
+void loadKeywords(const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (!file) return;
+    char bad[MAX_WORD], good[MAX_WORD];
+    while (fscanf(file, "%s %s", bad, good) == 2) {
+        strcpy(badWords[badCount], bad);
+        strcpy(goodWords[goodCount], good);
+        badCount++;
+        goodCount++;
+    }
+    fclose(file);
+}
+
+int max(int a, int b) {
+    return a > b ? a : b;
+}
+
+void buildSkipTable(char* pattern, int skipTable[256], int len) {
+    for (int i = 0; i < 256; i++) skipTable[i] = len;
+    for (int i = 0; i < len - 1; i++) skipTable[(unsigned char)pattern[i]] = len - i - 1;
+}
+
+int boyerMoore(const char* text, const char* pattern) {
+    int tlen = strlen(text);
+    int plen = strlen(pattern);
+    if (plen == 0) return 0;
+    int skip[256];
+    buildSkipTable((char*)pattern, skip, plen);
+    int i = plen - 1;
+    while (i < tlen) {
+        int j = plen - 1;
+        int k = i;
+        while (j >= 0 && text[k] == pattern[j]) {
+            k--; j--;
+        }
+        if (j < 0) return k + 1;
+        i += skip[(unsigned char)text[i]];
+    }
+    return -1;
+}
+
+int containsWord(const char* line, char words[][MAX_WORD], int count) {
+    for (int i = 0; i < count; i++) {
+        if (boyerMoore(line, words[i]) >= 0) return 1;
+    }
+    return 0;
+}
+
+void filterComment() {
+    loadKeywords("bad_good_words.txt");
+    FILE* file = fopen("fan_response.txt", "r");
+    if (!file) return;
+    char line[MAX_LINE];
+    printf("\n[Positive Comments]\n");
+    rewind(file);
+    while (fgets(line, MAX_LINE, file)) {
+        if (containsWord(line, goodWords, goodCount)) {
+            printf("%s", line);
+        }
+    }
+    rewind(file);
+    printf("\n[Neutral Comments]\n");
+    while (fgets(line, MAX_LINE, file)) {
+        if (!containsWord(line, badWords, badCount) && !containsWord(line, goodWords, goodCount)) {
+            printf("%s", line);
+        }
+    }
+    fclose(file);
+}
