@@ -1,0 +1,110 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h> // For sleep()
+
+#define MAX_LINE 100
+#define MAX_LINES 50
+
+typedef struct {
+    char lyrics[MAX_LINE];
+    char concept[MAX_LINE];
+    char danceSymbol[MAX_LINE];
+} SongWithDance;
+
+typedef struct {
+    char lyrics[MAX_LINE];
+    char userDanceSymbol[MAX_LINE];
+} MyAnswer;
+
+int LoadFile(SongWithDance songs[], const char *filename) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) {
+        perror("파일 열기 실패");
+        return 0;
+    }
+
+    int count = 0;
+    while (fgets(songs[count].lyrics, MAX_LINE, fp)) {
+        char *paren = strchr(songs[count].lyrics, '(');
+        char *brace = strchr(songs[count].lyrics, '{');
+
+        if (paren && brace) {
+            *paren = '\0';
+            paren++;
+            char *endParen = strchr(paren, ')');
+            if (endParen) *endParen = '\0';
+            strcpy(songs[count].concept, paren);
+
+            brace++;
+            char *endBrace = strchr(brace, '}');
+            if (endBrace) *endBrace = '\0';
+            strcpy(songs[count].danceSymbol, brace);
+
+            songs[count].lyrics[strcspn(songs[count].lyrics, "\n")] = '\0';
+            count++;
+        }
+    }
+
+    fclose(fp);
+    return count;
+}
+
+void DisplayHint(const SongWithDance songs[], int count, int delaySeconds) {
+    for (int i = 0; i < count; ++i) {
+        printf("[%d] %s (%s) {%s}\n", i + 1, songs[i].lyrics, songs[i].concept, songs[i].danceSymbol);
+    }
+
+    sleep(delaySeconds);
+#ifdef _WIN32
+    system("cls");
+#else
+    system("clear");
+#endif
+}
+
+void InputDanceSymbol(const SongWithDance songs[], MyAnswer answers[], int count) {
+    for (int i = 0; i < count; ++i) {
+        printf("가사: %s\n안무 표현 입력: ", songs[i].lyrics);
+        fgets(answers[i].userDanceSymbol, MAX_LINE, stdin);
+        answers[i].userDanceSymbol[strcspn(answers[i].userDanceSymbol, "\n")] = '\0';
+        strcpy(answers[i].lyrics, songs[i].lyrics);
+    }
+}
+
+void EvalMatchingRatio(const SongWithDance songs[], const MyAnswer answers[], int count) {
+    int correct = 0;
+
+    for (int i = 0; i < count; ++i) {
+        if (strcmp(songs[i].danceSymbol, answers[i].userDanceSymbol) == 0) {
+            correct++;
+        }
+    }
+
+    int ratio = (correct * 100) / count;
+    printf("제시된 가사에 대한 당신의 안무가 일치한 비율은 %d%% 입니다.\n", ratio);
+
+    for (int i = 0; i < count; ++i) {
+        if (strcmp(songs[i].danceSymbol, answers[i].userDanceSymbol) != 0) {
+            printf("불일치 가사: %s\n", songs[i].lyrics);
+        }
+    }
+}
+
+void RememberSongWithDance() {
+    SongWithDance songs[MAX_LINES];
+    MyAnswer answers[MAX_LINES];
+    int count;
+
+    int delay;
+    printf("힌트 표시 유지 시간(초)을 입력하세요: ");
+    scanf("%d", &delay);
+    getchar(); // newline 제거
+
+    count = LoadFile(songs, "song-with-dance.txt");
+    if (count == 0) return;
+
+    DisplayHint(songs, count, delay);
+    InputDanceSymbol(songs, answers, count);
+    EvalMatchingRatio(songs, answers, count);
+}
