@@ -1,0 +1,92 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
+#define MSG_MIN_LEN 24
+#define MSG_MAX_LEN 42
+#define AD_PANEL_WIDTH 18
+#define MSG_SET_COUNT 5
+#define DISPLAY_TIME_SECONDS 24
+
+char adMessages[MSG_SET_COUNT][2][MSG_MAX_LEN + 1];
+
+void inputAdMessages() {
+    for (int set = 0; set < MSG_SET_COUNT; set++) {
+        for (int line = 0; line < 2; line++) {
+            while (1) {
+                printf("홍보 메시지 세트 %d, %d번째 줄 (24~42자): ", set + 1, line + 1);
+                fgets(adMessages[set][line], MSG_MAX_LEN + 2, stdin);
+                size_t len = strlen(adMessages[set][line]);
+                if (len > 0 && adMessages[set][line][len - 1] == '\n') {
+                    adMessages[set][line][len - 1] = '\0';
+                    len--;
+                }
+                if (len >= MSG_MIN_LEN && len <= MSG_MAX_LEN) break;
+                printf("길이가 24~42자 사이여야 합니다. 다시 입력하세요.\n");
+            }
+        }
+    }
+}
+
+void clearScreen() {
+#ifdef _WIN32
+    system("cls");
+#else
+    system("clear");
+#endif
+}
+
+void msleep(int ms) {
+#ifdef _WIN32
+    Sleep(ms);
+#else
+    usleep(ms * 1000);
+#endif
+}
+
+void printAdPanel(const char* line1, const char* line2) {
+    printf("%.*s\n", AD_PANEL_WIDTH, line1);
+    printf("%.*s\n", AD_PANEL_WIDTH, line2);
+}
+
+void showMyAdMsg() {
+    inputAdMessages();
+    for (int set = 0; set < MSG_SET_COUNT; set++) {
+        size_t len1 = strlen(adMessages[set][0]);
+        size_t len2 = strlen(adMessages[set][1]);
+        size_t pos1 = 0;
+        size_t pos2 = 0;
+        int elapsedMs = 0;
+        const int line1_delay = 500;
+        const int line2_delay = 250;
+        int totalMs = DISPLAY_TIME_SECONDS * 1000;
+        while (elapsedMs < totalMs) {
+            clearScreen();
+            char displayLine1[AD_PANEL_WIDTH + 1];
+            for (int i = 0; i < AD_PANEL_WIDTH; i++) {
+                size_t idx = (pos1 + i) % (len1 + AD_PANEL_WIDTH);
+                if (idx < len1) displayLine1[i] = adMessages[set][0][idx];
+                else displayLine1[i] = ' ';
+            }
+            displayLine1[AD_PANEL_WIDTH] = '\0';
+            char displayLine2[AD_PANEL_WIDTH + 1];
+            for (int i = 0; i < AD_PANEL_WIDTH; i++) {
+                size_t idx = (pos2 + i) % (len2 + AD_PANEL_WIDTH);
+                if (idx < len2) displayLine2[i] = adMessages[set][1][idx];
+                else displayLine2[i] = ' ';
+            }
+            displayLine2[AD_PANEL_WIDTH] = '\0';
+            printAdPanel(displayLine1, displayLine2);
+            msleep(50);
+            elapsedMs += 50;
+            if (elapsedMs % line1_delay == 0) pos1 = (pos1 + 1) % (len1 + AD_PANEL_WIDTH);
+            if (elapsedMs % line2_delay == 0) pos2 = (pos2 + 1) % (len2 + AD_PANEL_WIDTH);
+        }
+    }
+}
