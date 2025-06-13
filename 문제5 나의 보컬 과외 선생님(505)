@@ -1,0 +1,183 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define MAX_TUTORS 10
+#define MAX_MEMBERS 10
+#define NAME_LEN 50
+
+typedef struct {
+    char name[NAME_LEN];
+    char skill[200];
+    int active;
+} VocalTutor;
+
+typedef struct {
+    char name[NAME_LEN];
+    VocalTutor *assignedTutor;
+} Trainee;
+
+VocalTutor tutorPool[MAX_TUTORS];
+Trainee members[MAX_MEMBERS];
+
+const char *memberNames[MAX_MEMBERS] = {
+    "서연", "민재", "지후", "하늘", "도윤",
+    "예린", "현우", "아린", "지민", "수빈"
+};
+
+void initTutorPool() {
+    const char *names[MAX_TUTORS] = {
+        "아리아", "레트로", "매직", "심포니", "사이렌",
+        "룬", "퓨처", "매시브", "에코", "루시드"
+    };
+    const char *skills[MAX_TUTORS] = {
+        "넓은 음역대와 강렬한 음성으로 다양한 음악 장르 소화",
+        "다양한 시대의 음악 스타일을 소화하며 현대적/고전적 조합",
+        "음악을 통해 감정과 상상을 자아내는 마법적인 능력",
+        "악기와 보컬을 결합하여 오케스트라 효과 창출",
+        "미스테리한 노래로 감성적인 여행 제공",
+        "상상의 세계 창조로 특별한 감동 제공",
+        "미래 지향적이고 혁신적인 가이던스 제공",
+        "강력한 보이스로 격려 및 힘 실어줌",
+        "감정과 메시지를 반영하여 의미 전달",
+        "감성적인 디지털 사운드와 꿈 같은 보이스 전달"
+    };
+
+    for (int i = 0; i < MAX_TUTORS; i++) {
+        strncpy(tutorPool[i].name, names[i], NAME_LEN);
+        strncpy(tutorPool[i].skill, skills[i], 200);
+        tutorPool[i].active = 1;
+    }
+}
+
+void assignTutorsRandomly() {
+    int used[MAX_TUTORS] = {0};
+    for (int i = 0; i < MAX_MEMBERS; i++) {
+        int t;
+        do {
+            t = rand() % MAX_TUTORS;
+        } while (used[t] || !tutorPool[t].active);
+        members[i].assignedTutor = &tutorPool[t];
+        strncpy(members[i].name, memberNames[i], NAME_LEN);
+        used[t] = 1;
+    }
+}
+
+void printAssignments() {
+    printf("\n[연습생과 할당된 튜터 목록]\n");
+    for (int i = 0; i < MAX_MEMBERS; i++) {
+        printf("%s → %s\n", members[i].name, 
+            members[i].assignedTutor ? members[i].assignedTutor->name : "없음");
+    }
+}
+
+void removeRandomTutor() {
+    int index;
+    do {
+        index = rand() % MAX_TUTORS;
+    } while (!tutorPool[index].active);
+    tutorPool[index].active = 0;
+    for (int i = 0; i < MAX_MEMBERS; i++) {
+        if (members[i].assignedTutor == &tutorPool[index]) {
+            members[i].assignedTutor = NULL;
+        }
+    }
+    printf("\n[알림] '%s' 튜터가 중도 하차하였습니다.\n", tutorPool[index].name);
+}
+
+void reassignMissingTutors() {
+    int used[MAX_TUTORS] = {0};
+    for (int i = 0; i < MAX_MEMBERS; i++) {
+        if (members[i].assignedTutor) {
+            for (int t = 0; t < MAX_TUTORS; t++) {
+                if (members[i].assignedTutor == &tutorPool[t]) {
+                    used[t] = 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    for (int i = 0; i < MAX_MEMBERS; i++) {
+        if (members[i].assignedTutor == NULL) {
+            int t;
+            do {
+                t = rand() % MAX_TUTORS;
+            } while (used[t] || !tutorPool[t].active);
+            members[i].assignedTutor = &tutorPool[t];
+            used[t] = 1;
+            printf("%s → 새 튜터 '%s' 재할당됨\n", members[i].name, tutorPool[t].name);
+        }
+    }
+}
+
+int rps(int user, int comp) {
+    if (user == comp) return 0;
+    if ((user == 1 && comp == 3) || (user == 2 && comp == 1) || (user == 3 && comp == 2))
+        return 1;
+    return -1;
+}
+
+void playRpsGame() {
+    char userName[NAME_LEN];
+    char targetName[NAME_LEN];
+    int userIdx = -1, targetIdx = -1;
+
+    printf("튜터 교환 요청 연습생 이름 입력: ");
+    fgets(userName, NAME_LEN, stdin);
+    userName[strcspn(userName, "\n")] = 0;
+
+    printf("상대 연습생 이름 입력: ");
+    fgets(targetName, NAME_LEN, stdin);
+    targetName[strcspn(targetName, "\n")] = 0;
+
+    for (int i = 0; i < MAX_MEMBERS; i++) {
+        if (strcmp(members[i].name, userName) == 0) userIdx = i;
+        if (strcmp(members[i].name, targetName) == 0) targetIdx = i;
+    }
+
+    if (userIdx == -1 || targetIdx == -1 || userIdx == targetIdx) {
+        printf("잘못된 연습생 이름입니다.\n");
+        return;
+    }
+
+    printf("가위(1), 바위(2), 보(3): ");
+    int userMove;
+    scanf("%d%*c", &userMove);
+
+    int compMove = rand() % 3 + 1;
+    int result = rps(userMove, compMove);
+
+    if (result == 1) {
+        VocalTutor *temp = members[userIdx].assignedTutor;
+        members[userIdx].assignedTutor = members[targetIdx].assignedTutor;
+        members[targetIdx].assignedTutor = temp;
+        printf("승리! 튜터가 교환되었습니다.\n");
+    } else if (result == 0) {
+        printf("비겼습니다. 튜터 교환 실패.\n");
+    } else {
+        printf("졌습니다. 튜터 교환 실패.\n");
+    }
+}
+
+void adminVocalTuition() {
+    srand(time(NULL));
+    initTutorPool();
+    assignTutorsRandomly();
+    printAssignments();
+    removeRandomTutor();
+    reassignMissingTutors();
+    printAssignments();
+
+    int choice;
+    printf("\n튜터 교환을 위한 가위바위보 게임을 하시겠습니까? (1: 예, 0: 아니오): ");
+    scanf("%d%*c", &choice);
+
+    if (choice == 1) {
+        playRpsGame();
+        printAssignments();
+    } else {
+        printf("요청이 거부되었습니다.\n");
+    }
+}
