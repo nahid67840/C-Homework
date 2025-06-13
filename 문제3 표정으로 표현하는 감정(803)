@@ -1,0 +1,169 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_EXPR_LEN 50
+#define MAX_DESC_LEN 256
+
+typedef struct ExpressionNode {
+    char expression[MAX_EXPR_LEN];
+    char description[MAX_DESC_LEN];
+    struct ExpressionNode *prev;
+    struct ExpressionNode *next;
+} ExpressionNode;
+
+ExpressionNode *head = NULL;
+
+void freeList() {
+    ExpressionNode *cur = head;
+    while (cur) {
+        ExpressionNode *tmp = cur;
+        cur = cur->next;
+        free(tmp);
+    }
+    head = NULL;
+}
+
+int loadExpressions(const char *filename) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) {
+        printf("파일 열기 실패: %s\n", filename);
+        return 0;
+    }
+
+    char line[512];
+    while (fgets(line, sizeof(line), fp)) {
+        char *expr = strtok(line, ",");
+        char *desc = strtok(NULL, "\r\n");
+        if (!expr || !desc) continue;
+
+        ExpressionNode *node = malloc(sizeof(ExpressionNode));
+        if (!node) {
+            fclose(fp);
+            freeList();
+            return 0;
+        }
+        strncpy(node->expression, expr, MAX_EXPR_LEN - 1);
+        node->expression[MAX_EXPR_LEN - 1] = '\0';
+        strncpy(node->description, desc, MAX_DESC_LEN - 1);
+        node->description[MAX_DESC_LEN - 1] = '\0';
+        node->prev = NULL;
+        node->next = NULL;
+
+        if (!head) {
+            head = node;
+        } else {
+            ExpressionNode *cur = head;
+            while (cur->next) cur = cur->next;
+            cur->next = node;
+            node->prev = cur;
+        }
+    }
+    fclose(fp);
+    return 1;
+}
+
+void printExpressions() {
+    ExpressionNode *cur = head;
+    while (cur) {
+        printf("표정명: %s\n", cur->expression);
+        printf("설명: %s\n\n", cur->description);
+        cur = cur->next;
+    }
+}
+
+void searchByKeyword(const char *keyword) {
+    ExpressionNode *cur = head;
+    int found = 0;
+    while (cur) {
+        if (strstr(cur->description, keyword)) {
+            printf("표정명: %s\n", cur->expression);
+            printf("설명: %s\n\n", cur->description);
+            found = 1;
+        }
+        cur = cur->next;
+    }
+    if (!found) {
+        printf("키워드 '%s'를 포함하는 표정을 찾을 수 없습니다.\n", keyword);
+    }
+}
+
+void swapAdjacentNodes(ExpressionNode **headRef, ExpressionNode *first) {
+    if (!first || !first->next) return;
+
+    ExpressionNode *second = first->next;
+    ExpressionNode *prev = first->prev;
+    ExpressionNode *next = second->next;
+
+    second->prev = prev;
+    if (prev) prev->next = second;
+    else *headRef = second;
+
+    first->next = next;
+    if (next) next->prev = first;
+
+    second->next = first;
+    first->prev = second;
+}
+
+void haveALook() {
+    if (!loadExpressions("look.txt")) return;
+
+    int choice;
+    char keyword[100];
+
+    while (1) {
+        printf("\n[표정 관리]\n");
+        printf("1. 전체 표정 출력\n");
+        printf("2. 설명 키워드로 검색\n");
+        printf("3. 인접 표정 노드 교환\n");
+        printf("0. 종료\n");
+        printf("선택: ");
+        scanf("%d", &choice);
+        getchar();
+
+        switch (choice) {
+            case 1:
+                printExpressions();
+                break;
+            case 2:
+                printf("검색할 키워드 입력: ");
+                fgets(keyword, sizeof(keyword), stdin);
+                keyword[strcspn(keyword, "\r\n")] = 0;
+                searchByKeyword(keyword);
+                break;
+            case 3: {
+                ExpressionNode *cur = head;
+                if (!cur || !cur->next) {
+                    printf("교환할 노드가 충분하지 않습니다.\n");
+                    break;
+                }
+                printf("교환할 첫 번째 표정명을 입력하세요: ");
+                char expr[MAX_EXPR_LEN];
+                fgets(expr, sizeof(expr), stdin);
+                expr[strcspn(expr, "\r\n")] = 0;
+
+                while (cur && strcmp(cur->expression, expr) != 0) cur = cur->next;
+                if (!cur || !cur->next) {
+                    printf("해당 표정이나 인접 노드가 없습니다.\n");
+                    break;
+                }
+
+                swapAdjacentNodes(&head, cur);
+                printf("교환 완료 후 전체 표정 출력:\n");
+                printExpressions();
+                break;
+            }
+            case 0:
+                freeList();
+                return;
+            default:
+                break;
+        }
+    }
+}
+
+int main() {
+    haveALook();
+    return 0;
+}
