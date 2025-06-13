@@ -1,0 +1,180 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+#define MAX_SUBMENUS 6
+#define MAX_DASHBOARD_ITEMS 6
+#define MAX_NAME_LEN 20
+#define MAX_NICK_LEN 10
+
+typedef struct {
+    char id;
+    char name[MAX_NAME_LEN + 1];
+} SubMenu;
+
+typedef struct {
+    char nickname[MAX_NICK_LEN + 1];
+    char name[MAX_NAME_LEN + 1];
+} Member;
+
+typedef struct {
+    char submenuIDs[MAX_SUBMENUS + 1];
+    char memberName[MAX_NAME_LEN + 1];
+    int count;
+} Dashboard;
+
+Member members[] = {
+    {"sam", "Samuel"},
+    {"leo", "Leonard"},
+    {"mia", "Mia"},
+    {"jay", "Jayden"},
+    {"liz", "Elizabeth"},
+    {"kim", "Kimberly"},
+    {"", ""}
+};
+
+SubMenu subMenus[] = {
+    {'A', "멘토링"},
+    {'B', "트라우마 관리"},
+    {'D', "자기 성찰"},
+    {'E', "여정 기록"},
+    {'F', "감정 일기"},
+    {'\0', ""}
+};
+
+Dashboard dashboard = {{0}, "", 0};
+
+void printMembers() {
+    int i = 0;
+    while (members[i].nickname[0]) {
+        printf("%s\n", members[i].nickname);
+        i++;
+    }
+}
+
+int findMemberByNickname(const char *nick) {
+    int i = 0;
+    while (members[i].nickname[0]) {
+        int j = 0;
+        int matched = 1;
+        while (nick[j]) {
+            if (nick[j] != members[i].nickname[j]) {
+                matched = 0;
+                break;
+            }
+            j++;
+        }
+        if (matched && members[i].nickname[j] == '\0') return i;
+        i++;
+    }
+    return -1;
+}
+
+void selectSubMenu(char *memberName) {
+    printf("하위 메뉴 목록\n");
+    int i = 0;
+    while (subMenus[i].id) {
+        printf("%c. %s\n", subMenus[i].id, subMenus[i].name);
+        i++;
+    }
+    printf("선택할 하위 메뉴 ID를 입력하세요(복수 가능, 예: ABD): ");
+    char input[20] = {0};
+    scanf("%19s", input);
+    int len = 0;
+    while (input[len]) len++;
+
+    dashboard.count = 0;
+    int k;
+    for (k = 0; k < len && k < MAX_SUBMENUS; k++) {
+        dashboard.submenuIDs[k] = input[k];
+    }
+    dashboard.submenuIDs[k] = '\0';
+
+    int mIndex = findMemberByNickname(memberName);
+    if (mIndex >= 0) {
+        int c = 0;
+        while (members[mIndex].name[c]) {
+            dashboard.memberName[c] = members[mIndex].name[c];
+            c++;
+        }
+        dashboard.memberName[c] = '\0';
+    }
+    dashboard.count = len;
+}
+
+void displayDashboard() {
+    if (dashboard.count == 0) {
+        printf("대시보드에 표시할 메뉴가 없습니다.\n");
+        return;
+    }
+    printf("=== %s의 대시보드 ===\n", dashboard.memberName);
+    int i;
+    for (i = 0; i < dashboard.count; i++) {
+        char id = dashboard.submenuIDs[i];
+        printf("---- [%c] ", id);
+        int j = 0;
+        while (subMenus[j].id) {
+            if (subMenus[j].id == id) {
+                printf("%s ----\n", subMenus[j].name);
+                break;
+            }
+            j++;
+        }
+        switch (id) {
+            case 'A':
+                printf("멘토 ID: M001\n멘토 명: Mentor Lee\n");
+                break;
+            case 'B':
+                printf("트라우마: 과거 트라우마 사례\n상담 내용: 심층 상담 기록\n");
+                break;
+            case 'D':
+                printf("날짜: 20250527\n성찰 질문: 나는 무엇을 배웠는가?\n답변: 팀워크가 중요함을 깨달았다.\n");
+                break;
+            case 'E':
+                printf("날짜: 2025년 05월 27일\n내용: 중요한 경험을 기록함\nwow effect: Meaningful\n");
+                break;
+            case 'F':
+                printf("감정 일기 질문: 최근에 어떤 일이 있었나요?\n입력 내용: 큰 성취감을 느꼈다.\n");
+                break;
+            default:
+                printf("데이터가 없습니다.\n");
+                break;
+        }
+    }
+}
+
+void showDashboard() {
+    printf("멤버 닉네임 목록\n");
+    printMembers();
+    printf("닉네임을 입력하세요: ");
+    char nick[20];
+    scanf("%19s", nick);
+    int idx = findMemberByNickname(nick);
+    if (idx < 0) {
+        printf("멤버를 찾을 수 없습니다.\n");
+        return;
+    }
+    printf("멤버 이름: %s\n", members[idx].name);
+    while (1) {
+        printf("1. 대시보드 편집\n2. 대시보드 표시\n3. 종료\n선택: ");
+        int sel;
+        scanf("%d", &sel);
+        if (sel == 1) {
+            selectSubMenu(nick);
+        } else if (sel == 2) {
+            if (dashboard.count == 0) {
+                printf("편집된 대시보드가 없습니다.\n");
+            } else {
+                displayDashboard();
+            }
+        } else if (sel == 3) {
+            break;
+        } else {
+            printf("잘못된 선택입니다.\n");
+        }
+    }
+}
+
+int main() {
+    showDashboard();
+    return 0;
+}
