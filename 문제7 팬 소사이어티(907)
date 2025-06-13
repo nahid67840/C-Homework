@@ -1,0 +1,122 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+#define QUEUE_SIZE 20
+
+typedef struct MsgNode {
+    int value;
+    struct MsgNode* next;
+} MsgNode;
+
+typedef struct {
+    int buffer[QUEUE_SIZE];
+    int front;
+    int rear;
+    int count;
+} CircularQueue;
+
+CircularQueue msgQueue = {{0}, 0, 0, 0};
+MsgNode* deliveredListHead = NULL;
+
+int isFull() {
+    return msgQueue.count == QUEUE_SIZE;
+}
+
+int isEmpty() {
+    return msgQueue.count == 0;
+}
+
+void enqueue(int val) {
+    if (isFull()) {
+        printf("원형큐가 포화 상태입니다.\n");
+        return;
+    }
+    msgQueue.buffer[msgQueue.rear] = val;
+    msgQueue.rear = (msgQueue.rear + 1) % QUEUE_SIZE;
+    msgQueue.count++;
+}
+
+int dequeue(int* val) {
+    if (isEmpty()) return 0;
+    *val = msgQueue.buffer[msgQueue.front];
+    msgQueue.front = (msgQueue.front + 1) % QUEUE_SIZE;
+    msgQueue.count--;
+    return 1;
+}
+
+void printQueue() {
+    printf("큐 상태: [");
+    for (int i = 0; i < msgQueue.count; i++) {
+        int idx = (msgQueue.front + i) % QUEUE_SIZE;
+        printf("%d", msgQueue.buffer[idx]);
+        if (i < msgQueue.count - 1) printf(", ");
+    }
+    printf("]\n");
+}
+
+void addDeliveredMsg(int val) {
+    MsgNode* node = (MsgNode*)malloc(sizeof(MsgNode));
+    node->value = val;
+    node->next = NULL;
+    if (deliveredListHead == NULL) {
+        deliveredListHead = node;
+    } else {
+        MsgNode* cur = deliveredListHead;
+        while (cur->next != NULL) cur = cur->next;
+        cur->next = node;
+    }
+}
+
+int countSumInRange() {
+    if (deliveredListHead == NULL || deliveredListHead->next == NULL) return 0;
+    int count = 0;
+    MsgNode* cur = deliveredListHead;
+    while (cur->next != NULL) {
+        int sum = cur->value + cur->next->value;
+        if (sum >= 24 && sum <= 42) count++;
+        cur = cur->next;
+    }
+    return count;
+}
+
+void freeDeliveredList() {
+    MsgNode* cur = deliveredListHead;
+    while (cur != NULL) {
+        MsgNode* tmp = cur;
+        cur = cur->next;
+        free(tmp);
+    }
+    deliveredListHead = NULL;
+}
+
+void bufferMsgSpeed() {
+    int n;
+    printf("처리할 메시지 개수 입력: ");
+    scanf("%d", &n);
+
+    srand((unsigned int)time(NULL));
+
+    for (int i = 0; i < n; i++) {
+        int num = rand() % 100 + 1;
+
+        if (num % 5 == 0) {
+            printf("수신된 좋은 메시지: %d\n", num);
+            enqueue(num);
+            printQueue();
+        }
+        if (num % 10 == 0) {
+            int val;
+            if (dequeue(&val)) {
+                printf("전달된 메시지: %d\n", val);
+                addDeliveredMsg(val);
+                printQueue();
+            } else {
+                printf("전달할 메시지가 없습니다.\n");
+            }
+        }
+    }
+    int cnt = countSumInRange();
+    printf("인접한 두 메시지 합이 24~42인 경우의 수: %d\n", cnt);
+    freeDeliveredList();
+}
