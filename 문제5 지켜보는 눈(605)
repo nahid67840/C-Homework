@@ -1,0 +1,129 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_PATTERNS 100
+#define MAX_STR_LEN 256
+
+typedef struct {
+    char id[MAX_STR_LEN];
+    char name[MAX_STR_LEN];
+    char description[MAX_STR_LEN];
+} BreathingPattern;
+
+int parseBreathingPatterns(const char *filename, BreathingPattern patterns[], int *count) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("파일 열기 실패");
+        return 0;
+    }
+
+    char line[1024];
+    BreathingPattern bp;
+    int idx = 0;
+
+    while (fgets(line, sizeof(line), file)) {
+        if (strstr(line, "\"id\"")) {
+            sscanf(line, " \"id\": \"%[^"]", bp.id);
+        } else if (strstr(line, "\"name\"")) {
+            sscanf(line, " \"name\": \"%[^"]", bp.name);
+        } else if (strstr(line, "\"description\"")) {
+            sscanf(line, " \"description\": \"%[^"]", bp.description);
+            if (idx < MAX_PATTERNS) {
+                patterns[idx++] = bp;
+            }
+        }
+    }
+
+    fclose(file);
+    *count = idx;
+    return 1;
+}
+
+void guideMindfulnessBreathing() {
+    BreathingPattern patterns[MAX_PATTERNS];
+    int count = 0;
+
+    if (!parseBreathingPatterns("mindfulness_breathing.json", patterns, &count)) {
+        printf("호흡 패턴 데이터를 불러오는 데 실패했습니다.\n");
+        return;
+    }
+
+    printf("== 마인드풀니스 호흡 가이드 ==\n");
+    for (int i = 0; i < count; i++) {
+        printf("ID: %s | 이름: %s\n", patterns[i].id, patterns[i].name);
+    }
+
+    char input[MAX_STR_LEN];
+    while (1) {
+        printf("\n패턴 ID를 입력하세요 (종료하려면 'q' 또는 'quit'): ");
+        scanf("%s", input);
+        if (strcmp(input, "q") == 0 || strcmp(input, "quit") == 0) {
+            break;
+        }
+
+        int found = 0;
+        for (int i = 0; i < count; i++) {
+            if (strcmp(input, patterns[i].id) == 0) {
+                printf("패턴 이름: %s\n설명: %s\n", patterns[i].name, patterns[i].description);
+                found = 1;
+                printf("즐겨 찾기로 등록하시겠습니까? (y/n): ");
+                char choice[4];
+                scanf("%s", choice);
+                if (strcmp(choice, "y") == 0 || strcmp(choice, "Y") == 0) {
+                    FILE *f = fopen("mymindfulness.json", "a");
+                    if (f) {
+                        fprintf(f,
+                                "{ \"id\": \"%s\", \"name\": \"%s\", \"how-to\": \"%s\" }\n",
+                                patterns[i].id, patterns[i].name, patterns[i].description);
+                        fclose(f);
+                        printf("즐겨 찾기에 등록되었습니다.\n");
+                    } else {
+                        printf("즐겨찾기 파일에 접근할 수 없습니다.\n");
+                    }
+                }
+                break;
+            }
+        }
+        if (!found) {
+            printf("입력한 ID와 일치하는 패턴이 없습니다.\n");
+        }
+    }
+}
+
+void showDanceTrainingMenu() {
+    int choice;
+    while (1) {
+        printf("\n== 댄스 훈련 메뉴 ==\n");
+        printf("1. 기본 댄스\n");
+        printf("5. 마인드풀니스 호흡\n");
+        printf("0. 뒤로가기\n");
+        scanf("%d", &choice);
+        if (choice == 5) {
+            guideMindfulnessBreathing();
+        } else if (choice == 0) {
+            break;
+        }
+    }
+}
+
+void showTrainingMenu() {
+    int choice;
+    while (1) {
+        printf("\n== 훈련 메뉴 ==\n");
+        printf("1. 기타 훈련\n");
+        printf("2. 댄스 훈련\n");
+        printf("0. 종료\n");
+        scanf("%d", &choice);
+        if (choice == 2) {
+            showDanceTrainingMenu();
+        } else if (choice == 0) {
+            break;
+        }
+    }
+}
+
+int main() {
+    showTrainingMenu();
+    return 0;
+}
