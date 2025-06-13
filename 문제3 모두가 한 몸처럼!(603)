@@ -1,0 +1,231 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define MAX_LYRICS 100
+#define MAX_LINE_LENGTH 256
+#define MAX_PARTS 7
+#define MAX_MEMBERS 10
+#define MAX_NAME_LENGTH 50
+#define MAX_TESTS_PER_DAY 3
+
+// === Song Structures ===
+typedef struct {
+    char *title;
+    char *lyrics[MAX_LYRICS];
+    int line_count;
+} Song;
+
+typedef enum {
+    INTRO, VERSE1, PRECHORUS, CHORUS, VERSE2, BRIDGE, FINALCHORUS
+} SongPartType;
+
+typedef struct {
+    SongPartType part_type;
+    int indices[MAX_LYRICS];
+    int count;
+    char assigned_member[MAX_NAME_LENGTH];
+} SongPart;
+
+typedef struct {
+    Song song;
+    SongPart parts[MAX_PARTS];
+} AnalyzedSong;
+
+// === Beat Training Structures ===
+typedef struct {
+    int bpm;
+    char rhythm[8];
+} TempoRhythm;
+
+typedef struct {
+    char name[MAX_NAME_LENGTH];
+    char date[20]; // YYMMDDHH
+    int expected_beats;
+    double time_taken;
+} BeatRecord;
+
+// === Song Functions ===
+void printLyrics(Song *song) {
+    printf("=== Lyrics ===\n");
+    for (int i = 0; i < song->line_count; ++i) {
+        printf("[%d] %s\n", i, song->lyrics[i]);
+    }
+}
+
+void analyzeSong(Song *song, AnalyzedSong *analysis) {
+    analysis->song = *song;
+    for (int i = 0; i < MAX_PARTS; i++) {
+        analysis->parts[i].part_type = i;
+        analysis->parts[i].count = 0;
+        printf("Enter line indices for part %d (end with -1):\n", i);
+        int index;
+        while (1) {
+            scanf("%d", &index);
+            if (index == -1) break;
+            if (index >= 0 && index < song->line_count) {
+                analysis->parts[i].indices[analysis->parts[i].count++] = index;
+            }
+        }
+    }
+}
+
+void assignSongPart(AnalyzedSong *analysis) {
+    char group_name[MAX_NAME_LENGTH];
+    int member_count;
+
+    printf("Enter group name: ");
+    scanf("%s", group_name);
+    printf("Enter number of members: ");
+    scanf("%d", &member_count);
+
+    for (int i = 0; i < member_count; i++) {
+        char member_name[MAX_NAME_LENGTH];
+        printf("Enter name for member %d: ", i + 1);
+        scanf("%s", member_name);
+
+        printf("Select part index (0:Intro ~ 6:Final Chorus) for %s: ", member_name);
+        int part_index;
+        scanf("%d", &part_index);
+
+        if (part_index >= 0 && part_index < MAX_PARTS) {
+            strncpy(analysis->parts[part_index].assigned_member, member_name, MAX_NAME_LENGTH);
+        }
+    }
+}
+
+void printAnalyzedSong(AnalyzedSong *analysis) {
+    printf("=== Analyzed Song Structure ===\n");
+    for (int i = 0; i < MAX_PARTS; i++) {
+        printf("Part %d assigned to %s:\n", i, analysis->parts[i].assigned_member[0] ? analysis->parts[i].assigned_member : "None");
+        for (int j = 0; j < analysis->parts[i].count; j++) {
+            int idx = analysis->parts[i].indices[j];
+            printf("  [%d] %s\n", idx, analysis->song.lyrics[idx]);
+        }
+    }
+}
+
+void printPartLyrics(AnalyzedSong *analysis, const char *member_name) {
+    printf("Lyrics for %s:\n", member_name);
+    for (int i = 0; i < MAX_PARTS; ++i) {
+        if (strcmp(analysis->parts[i].assigned_member, member_name) == 0) {
+            for (int j = 0; j < analysis->parts[i].count; j++) {
+                int idx = analysis->parts[i].indices[j];
+                printf("  [%d] %s\n", idx, analysis->song.lyrics[idx]);
+            }
+        }
+    }
+}
+
+void understandSongs(Song *song) {
+    AnalyzedSong analyzed;
+    analyzeSong(song, &analyzed);
+    assignSongPart(&analyzed);
+    printAnalyzedSong(&analyzed);
+}
+
+void loadLyricsFromFile(Song *song, const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("File open error");
+        return;
+    }
+
+    song->line_count = 0;
+    song->title = "Spring Day";
+    char buffer[MAX_LINE_LENGTH];
+    while (fgets(buffer, MAX_LINE_LENGTH, file) && song->line_count < MAX_LYRICS) {
+        song->lyrics[song->line_count] = strdup(buffer);
+        song->line_count++;
+    }
+    fclose(file);
+}
+
+// === Beat Training ===
+int inputTrainee(char *name) {
+    FILE *file = fopen("trainee.csv", "r");
+    if (!file) {
+        perror("trainee.csv open error");
+        return 0;
+    }
+    char line[128];
+    while (fgets(line, sizeof(line), file)) {
+        if (strstr(line, name)) {
+            fclose(file);
+            return 1;
+        }
+    }
+    fclose(file);
+    return 0;
+}
+
+void writeFile(BeatRecord *record) {
+    FILE *file = fopen("beat_test_result.txt", "a");
+    if (!file) {
+        perror("Result file open error");
+        return;
+    }
+    fprintf(file, "%s,%s,%d,%.2lf\n", record->name, record->date, record->expected_beats, record->time_taken);
+    fclose(file);
+}
+
+void printResult(BeatRecord *record) {
+    double expected_time = 60.0;
+    double diff = record->time_taken - expected_time;
+    printf("Test completed. Expected time: %.2f sec, Actual time: %.2f sec, ", expected_time, record->time_taken);
+    if (diff > 0) printf("%.2f sec over\n", diff);
+    else printf("%.2f sec under\n", -diff);
+}
+
+void testBeat(BeatRecord *record) {
+    TempoRhythm presets[] = {
+        {60, "2/4"}, {60, "3/4"}, {80, "4/4"}, {120, "6/8"}
+    };
+    int idx = rand() % 4;
+    TempoRhythm t = presets[idx];
+    int beats = t.bpm;
+
+    printf("Tempo: %d BPM\nRhythm: %s\nExpected beats in 60s: %d\n", t.bpm, t.rhythm, beats);
+    printf("Press Enter to start counting beats for 60 seconds...\n");
+    getchar(); getchar();
+
+    time_t start = time(NULL);
+    printf("Counting... Press Enter when done.\n");
+    getchar();
+    time_t end = time(NULL);
+
+    time_t now = time(NULL);
+    struct tm *tm_info = localtime(&now);
+    strftime(record->date, sizeof(record->date), "%y%m%d%H", tm_info);
+
+    record->expected_beats = beats;
+    record->time_taken = difftime(end, start);
+    printResult(record);
+    writeFile(record);
+}
+
+void improveSenseOfBeat() {
+    BeatRecord record;
+    printf("Enter trainee name: ");
+    scanf("%s", record.name);
+    if (!inputTrainee(record.name)) {
+        printf("Trainee not found in trainee.csv\n");
+        return;
+    }
+    for (int i = 0; i < MAX_TESTS_PER_DAY; ++i) {
+        printf("\nTest %d:\n", i + 1);
+        testBeat(&record);
+    }
+}
+
+int main() {
+    srand((unsigned int)time(NULL));
+
+    Song song;
+    loadLyricsFromFile(&song, "spring_day.txt");
+    understandSongs(&song);
+
+    improveSenseOfBeat();
+    return 0;
+}
