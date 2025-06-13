@@ -1,0 +1,203 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <time.h>
+
+#define MAX_POSE_NAME 50
+#define MAX_POSE_DESC 256
+#define POSE_FILENAME "pose.txt"
+
+typedef struct Pose {
+    char name[MAX_POSE_NAME];
+    char desc[MAX_POSE_DESC];
+} Pose;
+
+typedef struct PoseNode {
+    Pose data;
+    struct PoseNode *prev;
+    struct PoseNode *next;
+} PoseNode;
+
+typedef struct {
+    Pose *arr;
+    int size;
+} PoseArray;
+
+int loadPoses(const char *filename, PoseArray *pa) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0;
+
+    int capacity = 10;
+    pa->arr = malloc(sizeof(Pose) * capacity);
+    pa->size = 0;
+    if (!pa->arr) {
+        fclose(fp);
+        return 0;
+    }
+
+    char line[MAX_POSE_NAME + MAX_POSE_DESC + 10];
+    while (fgets(line, sizeof(line), fp)) {
+        if (pa->size >= capacity) {
+            capacity *= 2;
+            Pose *tmp = realloc(pa->arr, sizeof(Pose) * capacity);
+            if (!tmp) {
+                free(pa->arr);
+                fclose(fp);
+                return 0;
+            }
+            pa->arr = tmp;
+        }
+
+        char *sep = strchr(line, '|');
+        if (!sep) continue;
+        *sep = 0;
+        char *name = line;
+        char *desc = sep + 1;
+
+        desc[strcspn(desc, "\r\n")] = 0;
+
+        strncpy(pa->arr[pa->size].name, name, MAX_POSE_NAME - 1);
+        pa->arr[pa->size].name[MAX_POSE_NAME - 1] = 0;
+        strncpy(pa->arr[pa->size].desc, desc, MAX_POSE_DESC - 1);
+        pa->arr[pa->size].desc[MAX_POSE_DESC - 1] = 0;
+
+        pa->size++;
+    }
+
+    fclose(fp);
+    return pa->size;
+}
+
+PoseNode *createNode(const Pose *p) {
+    PoseNode *node = malloc(sizeof(PoseNode));
+    if (!node) return NULL;
+    node->data = *p;
+    node->prev = node->next = NULL;
+    return node;
+}
+
+void freeList(PoseNode *head) {
+    if (!head) return;
+    PoseNode *cur = head;
+    PoseNode *next;
+    do {
+        next = cur->next;
+        free(cur);
+        cur = next;
+    } while (cur && cur != head);
+}
+
+int isInList(PoseNode *head, const Pose *p) {
+    if (!head) return 0;
+    PoseNode *cur = head;
+    do {
+        if (strcmp(cur->data.name, p->name) == 0) return 1;
+        cur = cur->next;
+    } while (cur != head);
+    return 0;
+}
+
+PoseNode *appendNode(PoseNode *tail, PoseNode *newNode) {
+    if (!tail) {
+        newNode->next = newNode->prev = newNode;
+        return newNode;
+    }
+    PoseNode *head = tail->next;
+    tail->next = newNode;
+    newNode->prev = tail;
+    newNode->next = head;
+    head->prev = newNode;
+    return newNode;
+}
+
+PoseNode *buildPoseList(const PoseArray *pa, int count) {
+    if (count < 3 || count > 5 || count > pa->size) return NULL;
+    PoseNode *tail = NULL;
+
+    int *used = calloc(pa->size, sizeof(int));
+    if (!used) return NULL;
+
+    int selected = 0;
+    while (selected < count) {
+        int r = rand() % pa->size;
+        if (!used[r]) {
+            used[r] = 1;
+            PoseNode *node = createNode(&pa->arr[r]);
+            if (!node) {
+                freeList(tail);
+                free(used);
+                return NULL;
+            }
+            tail = appendNode(tail, node);
+            selected++;
+        }
+    }
+    free(used);
+    return tail;
+}
+
+void printPose(const Pose *p) {
+    printf("포즈 이름: %s\n", p->name);
+    printf("포즈 설명: %s\n", p->desc);
+}
+
+int yesNoPrompt(const char *msg) {
+    char input[16];
+    while (1) {
+        printf("%s (yes/no): ", msg);
+        if (!fgets(input, sizeof(input), stdin)) return 0;
+        input[strcspn(input, "\r\n")] = 0;
+        for (int i=0; input[i]; i++) input[i] = tolower((unsigned char)input[i]);
+        if (strcmp(input, "yes") == 0) return 1;
+        if (strcmp(input, "no") == 0) return 0;
+        printf("yes 또는 no를 입력하세요.\n");
+    }
+}
+
+void waitSeconds(int sec) {
+    time_t start = time(NULL);
+    while (time(NULL) - start < sec) { }
+}
+
+void takePose() {
+    PoseArray pa = {NULL, 0};
+    if (!loadPoses(POSE_FILENAME, &pa)) {
+        printf("포즈 정보 파일 로드 실패\n");
+        return;
+    }
+
+    int poseCount;
+    printf("연습할 포즈 수 입력 (3~5): ");
+    scanf("%d", &poseCount);
+    while (poseCount < 3 || poseCount > 5) {
+        printf("3에서 5 사이로 다시 입력: ");
+        scanf("%d", &poseCount);
+    }
+    getchar();
+
+    PoseNode *poseList = buildPoseList(&pa, poseCount);
+    if (!poseList) {
+        printf("포즈 목록 생성 실패\n");
+        free(pa.arr);
+        return;
+    }
+
+    int repeat = 1;
+    while (repeat) {
+        for (int cycle = 0; cycle < 2; cycle++) {
+            printf("포즈 연습 %d회차 시작\n", cycle + 1);
+            PoseNode *cur = poseList->next; // head
+            do {
+                printPose(&cur->data);
+                printf("30초간 연습하세요...\n");
+                waitSeconds(30);
+                cur = cur->next;
+            } while (cur != poseList->next);
+        }
+        repeat = yesNoPrompt("계속 연습하시겠습니까?");
+    }
+
+    freeList(poseList);
+    free(pa.arr);
+}
