@@ -1,0 +1,172 @@
+#ifndef DEBUT_H
+#define DEBUT_H
+typedef struct City {
+    char name[20];
+    int x;
+    int y;
+    struct City* next;
+} City;
+void makeOptimalPath(void);
+#endif
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include "debut.h"
+
+#define CITY_COUNT 5
+
+City cities[CITY_COUNT] = {
+    {"서울", 12697, 3756, NULL},
+    {"구미", 12834, 3611, NULL},
+    {"대전", 12738, 3635, NULL},
+    {"춘천", 12773, 3788, NULL},
+    {"부산", 12907, 3518, NULL}
+};
+
+City* createCityNode(const char* name, int x, int y) {
+    City* node = (City*)malloc(sizeof(City));
+    if (!node) exit(EXIT_FAILURE);
+    strncpy(node->name, name, sizeof(node->name));
+    node->x = x;
+    node->y = y;
+    node->next = NULL;
+    return node;
+}
+
+double distanceBetween(City* a, City* b) {
+    int dx = a->x - b->x;
+    int dy = a->y - b->y;
+    return sqrt(dx*dx + dy*dy) / 10.0;
+}
+
+typedef struct Path {
+    City* route;
+    double totalDist;
+    struct Path* next;
+} Path;
+
+void freeCityList(City* head) {
+    City* cur = head;
+    while (cur) {
+        City* tmp = cur;
+        cur = cur->next;
+        free(tmp);
+    }
+}
+
+void freePathList(Path* head) {
+    Path* cur = head;
+    while (cur) {
+        Path* tmp = cur;
+        cur = cur->next;
+        freeCityList(tmp->route);
+        free(tmp);
+    }
+}
+
+City* cloneCityList(City** arr, int len) {
+    if (len == 0) return NULL;
+    City* head = createCityNode(arr[0]->name, arr[0]->x, arr[0]->y);
+    City* cur = head;
+    for (int i = 1; i < len; i++) {
+        cur->next = createCityNode(arr[i]->name, arr[i]->x, arr[i]->y);
+        cur = cur->next;
+    }
+    return head;
+}
+
+void permute(City** arr, int start, int end, Path** pathList) {
+    if (start == end) {
+        City* routeArr[CITY_COUNT];
+        routeArr[0] = &cities[0];
+        for (int i = 0; i < CITY_COUNT-2; i++) routeArr[i+1] = arr[i];
+        routeArr[CITY_COUNT-1] = &cities[4];
+
+        City* route = cloneCityList(routeArr, CITY_COUNT);
+
+        double dist = 0.0;
+        City* cur = route;
+        while (cur && cur->next) {
+            dist += distanceBetween(cur, cur->next);
+            cur = cur->next;
+        }
+
+        Path* newPath = (Path*)malloc(sizeof(Path));
+        if (!newPath) exit(EXIT_FAILURE);
+        newPath->route = route;
+        newPath->totalDist = dist;
+        newPath->next = NULL;
+
+        if (*pathList == NULL) {
+            *pathList = newPath;
+        } else {
+            Path* prev = NULL;
+            Path* curP = *pathList;
+            while (curP && curP->totalDist < dist) {
+                prev = curP;
+                curP = curP->next;
+            }
+            if (prev == NULL) {
+                newPath->next = *pathList;
+                *pathList = newPath;
+            } else {
+                newPath->next = curP;
+                prev->next = newPath;
+            }
+        }
+        return;
+    }
+    for (int i = start; i <= end; i++) {
+        City* tmp = arr[start];
+        arr[start] = arr[i];
+        arr[i] = tmp;
+        permute(arr, start+1, end, pathList);
+        tmp = arr[start];
+        arr[start] = arr[i];
+        arr[i] = tmp;
+    }
+}
+
+int countPaths() {
+    int fact = 1;
+    for (int i = 1; i <= 3; i++) fact *= i;
+    return fact;
+}
+
+void printPathDetails(Path* path) {
+    City* cur = path->route;
+    double total = 0.0;
+    while (cur && cur->next) {
+        printf("%s -> ", cur->name);
+        double d = distanceBetween(cur, cur->next);
+        printf("%.1f + ", d);
+        total += d;
+        cur = cur->next;
+    }
+    printf("%s\n", cur->name);
+    printf("총 이동 거리: %.1f\n\n", total);
+}
+
+void makeOptimalPath() {
+    City* mustPass[3];
+    mustPass[0] = &cities[2];
+    mustPass[1] = &cities[1];
+    mustPass[2] = &cities[3];
+
+    Path* allPaths = NULL;
+    permute(mustPass, 0, 2, &allPaths);
+
+    int totalCases = countPaths();
+    printf("가능한 경로 경우의 수: %d\n\n", totalCases);
+    printf("모든 경로와 총 이동 거리 (오름차순):\n");
+    Path* cur = allPaths;
+    int idx = 1;
+    while (cur) {
+        printf("%d) ", idx++);
+        printPathDetails(cur);
+        cur = cur->next;
+    }
+    freePathList(allPaths);
+}
