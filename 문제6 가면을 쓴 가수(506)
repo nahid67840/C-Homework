@@ -1,0 +1,102 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <ctype.h>
+
+#define MAX_MASKS 10
+#define MAX_TITLE 64
+
+typedef struct {
+    char maskName[MAX_TITLE];
+    char songTitle[MAX_TITLE];
+} MaskedSong;
+
+MaskedSong maskedSongs[MAX_MASKS] = {
+    {"곰발바닥", "이 밤의 끝을 잡고"},
+    {"주윤발", "단발머리"},
+    {"달마시안", "나의 옛날 이야기"},
+    {"천둥 호랑이", "Love Affair"},
+    {"개구리 왕자", "지친 하루"},
+    {"거북이", "그녀를 사랑해줘요"},
+    {"코끼리", "첫 인상"},
+    {"뱀파이어", "지금은 알 수 없어"},
+    {"햄스터", "내 얘길 들어봐"},
+    {"돌고래", "못다 핀 꽃 한 송이"}
+};
+
+void trimSpace(char *str) {
+    char *src = str, *dst = str;
+    while (*src != '\0') {
+        if (!isspace((unsigned char)*src)) {
+            *dst++ = *src;
+        }
+        src++;
+    }
+    *dst = '\0';
+}
+
+int compareTitle(const char *a, const char *b) {
+    char tempA[MAX_TITLE], tempB[MAX_TITLE];
+    strncpy(tempA, a, MAX_TITLE);
+    strncpy(tempB, b, MAX_TITLE);
+    trimSpace(tempA);
+    trimSpace(tempB);
+    return strcmp(tempA, tempB) == 0;
+}
+
+void shuffle(void *array, size_t n, size_t size) {
+    char *arr = array;
+    for (size_t i = n - 1; i > 0; i--) {
+        size_t j = rand() % (i + 1);
+        for (size_t b = 0; b < size; b++) {
+            char tmp = arr[i * size + b];
+            arr[i * size + b] = arr[j * size + b];
+            arr[j * size + b] = tmp;
+        }
+    }
+}
+
+void prepareMaskedStage() {
+    srand((unsigned int)time(NULL));
+    int totalScore = 0;
+    printf("=== 실전 복면 무대 연습 ===\n");
+    printf("총 5개의 복면 코드가 제시됩니다.\n");
+    printf("해당하는 노래 제목을 입력하세요.\n");
+    printf("30초 내 정답 시 +15점, 1분 이내 +10점, 초과 시 +5점 (정답일 경우)\n\n");
+
+    shuffle(maskedSongs, MAX_MASKS, sizeof(MaskedSong));
+
+    for (int i = 0; i < 5; i++) {
+        MaskedSong *m = &maskedSongs[i];
+        char input[MAX_TITLE];
+        time_t start = time(NULL);
+
+        printf("문제 %d: 복면 코드: 0x%X\n", i + 1, (unsigned int)(intptr_t)m->maskName);
+
+        printf("노래 제목 입력: ");
+        fgets(input, MAX_TITLE, stdin);
+        input[strcspn(input, "\n")] = '\0';
+
+        time_t end = time(NULL);
+        int duration = (int)(end - start);
+
+        if (compareTitle(m->songTitle, input)) {
+            if (duration <= 30) {
+                printf("정답! (30초 이내 보너스)\n");
+                totalScore += 15;
+            } else if (duration <= 60) {
+                printf("정답!\n");
+                totalScore += 10;
+            } else {
+                printf("정답! (시간 초과)\n");
+                totalScore += 5;
+            }
+        } else {
+            printf("오답! 정답은: %s\n", m->songTitle);
+        }
+        printf("\n");
+    }
+
+    printf("총점: %d점\n", totalScore);
+}
