@@ -1,0 +1,128 @@
+#if __GNUC__ != 9
+#error "컴파일러 버전이 맞지 않아 더 이상 컴파일을 진행할 수 없습니다."
+#endif
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_STR 100
+
+typedef struct HabitNode {
+    char habit[MAX_STR];
+    struct HabitNode* next;
+} HabitNode;
+
+typedef struct {
+    HabitNode* top;
+} Stack;
+
+typedef struct {
+    HabitNode* front;
+    HabitNode* rear;
+} Queue;
+
+void initStack(Stack* stack) {
+    stack->top = NULL;
+}
+
+void push(Stack* stack, const char* habit) {
+    HabitNode* newNode = (HabitNode*)malloc(sizeof(HabitNode));
+    strcpy(newNode->habit, habit);
+    newNode->next = stack->top;
+    stack->top = newNode;
+}
+
+void pop(Stack* stack) {
+    if (stack->top == NULL) {
+        printf("나쁜 습관이 없습니다.\n");
+        return;
+    }
+    HabitNode* temp = stack->top;
+    stack->top = stack->top->next;
+    printf("제거된 나쁜 습관: %s\n", temp->habit);
+    free(temp);
+}
+
+void printStack(Stack* stack) {
+    HabitNode* cur = stack->top;
+    while (cur) {
+        printf("%s\n", cur->habit);
+        cur = cur->next;
+    }
+}
+
+void initQueue(Queue* queue) {
+    queue->front = queue->rear = NULL;
+}
+
+void enqueue(Queue* queue, const char* habit) {
+    HabitNode* newNode = (HabitNode*)malloc(sizeof(HabitNode));
+    strcpy(newNode->habit, habit);
+    newNode->next = NULL;
+    if (queue->rear) {
+        queue->rear->next = newNode;
+    } else {
+        queue->front = newNode;
+    }
+    queue->rear = newNode;
+}
+
+void dequeue(Queue* queue) {
+    if (!queue->front) {
+        printf("좋은 습관이 없습니다.\n");
+        return;
+    }
+    HabitNode* temp = queue->front;
+    printf("드러난 좋은 습관: %s\n", temp->habit);
+    queue->front = temp->next;
+    if (!queue->front) queue->rear = NULL;
+    free(temp);
+}
+
+void printQueue(Queue* queue) {
+    HabitNode* cur = queue->front;
+    while (cur) {
+        printf("%s\n", cur->habit);
+        cur = cur->next;
+    }
+}
+
+void promoteGoodHabit() {
+    Stack badHabits;
+    Queue goodHabits;
+    initStack(&badHabits);
+    initQueue(&goodHabits);
+
+    FILE* file = fopen("habit.txt", "r");
+    if (!file) {
+        printf("habit.txt 파일을 열 수 없습니다.\n");
+        return;
+    }
+
+    char line[MAX_STR];
+    while (fgets(line, sizeof(line), file)) {
+        line[strcspn(line, "\n")] = '\0';
+        if (strncmp(line, "BAD:", 4) == 0) {
+            push(&badHabits, line + 4);
+        } else if (strncmp(line, "GOOD:", 5) == 0) {
+            enqueue(&goodHabits, line + 5);
+        }
+    }
+    fclose(file);
+
+    int choice;
+    printf("1. 나쁜 습관 제거\n2. 좋은 습관 드러내기\n선택: ");
+    scanf("%d", &choice);
+    getchar();
+
+    if (choice == 1) {
+        pop(&badHabits);
+        printStack(&badHabits);
+    } else if (choice == 2) {
+        dequeue(&goodHabits);
+        printQueue(&goodHabits);
+    } else {
+        printf("잘못된 선택입니다.\n");
+    }
+}
