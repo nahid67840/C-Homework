@@ -1,0 +1,125 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+#define WORDS_COUNT 100
+#define SELECTED_COUNT 42
+#define MAX_WORD_LENGTH 5
+#define MAX_NAME_LENGTH 20
+
+char words[WORDS_COUNT][MAX_WORD_LENGTH] = {
+    "가방", "방문", "문서", "서류", "유리", "리본", "본질", "질문", "문제", "제도",
+    "도시", "시간", "간식", "식당", "당근", "근육", "육상", "상자", "자전", "전기",
+    "기관", "관객", "객실", "실내", "내용", "용기", "기술", "술집", "집단", "단어",
+    "어머니", "이해", "해변", "변화", "화분", "분리", "이동", "동물", "물감", "감정",
+    "정신", "신발", "발전", "전화", "화면", "면도", "도구", "구름", "름달", "달걀",
+    "알림", "림프", "프린", "인터", "터널", "널리", "리터", "터미", "미소", "소문",
+    "문제", "제목", "목욕", "욕실", "실패", "패션", "션터", "터진", "진로", "로봇",
+    "봇물", "물가", "가방", "방패", "패배", "배꼽", "꼽살", "살림", "림픽", "픽업",
+    "업무", "무대", "대문", "문학", "학문", "문제", "제자", "자율", "율동", "동기",
+    "기관", "관계", "계산", "산책", "책장", "장면", "면접", "접수", "수업", "업종"
+};
+
+typedef struct {
+    char challenger[MAX_NAME_LENGTH];
+    int challengerScore;
+    int challengerTime;
+    char opponent[MAX_NAME_LENGTH];
+    int opponentScore;
+    int opponentTime;
+} Score;
+
+char wordList[SELECTED_COUNT][MAX_WORD_LENGTH];
+
+void copyWord(char *dest, char *src) {
+    while (*src) {
+        *dest = *src;
+        dest++;
+        src++;
+    }
+    *dest = '\0';
+}
+
+int compareString(char *a, char *b) {
+    while (*a && *b) {
+        if (*a != *b) return 0;
+        a++;
+        b++;
+    }
+    return (*a == '\0' && *b == '\0');
+}
+
+void shuffleWord() {
+    int indices[WORDS_COUNT], i;
+    for (i = 0; i < WORDS_COUNT; i++) indices[i] = i;
+    for (i = 0; i < WORDS_COUNT - 1; i++) {
+        int j = i + rand() % (WORDS_COUNT - i);
+        int tmp = indices[i];
+        indices[i] = indices[j];
+        indices[j] = tmp;
+    }
+    for (i = 0; i < SELECTED_COUNT; i++) {
+        int idx = indices[i];
+        copyWord(wordList[i], words[idx]);
+    }
+}
+
+int playGame(char *playerName, int *score) {
+    int start = time(NULL);
+    int end = start + 60;
+    int count = 0;
+    char input[MAX_WORD_LENGTH];
+    char current[MAX_WORD_LENGTH];
+    copyWord(current, wordList[0]);
+    printf("시작 단어: %s\n", current);
+    while (time(NULL) < end) {
+        printf("%s의 단어 입력: ", playerName);
+        scanf("%s", input);
+        int valid = 0;
+        for (int i = 0; i < SELECTED_COUNT; i++) {
+            if (compareString(input, wordList[i])) {
+                valid = 1;
+                break;
+            }
+        }
+        if (!valid) continue;
+        if (input[0] != current[2] && input[0] != current[1]) continue;
+        copyWord(current, input);
+        count++;
+    }
+    *score = count;
+    return time(NULL) - start;
+}
+
+void displayWinner(Score s) {
+    printf("\n게임 결과:\n");
+    printf("%s: %d단어 (%d초)\n", s.challenger, s.challengerScore, s.challengerTime);
+    printf("%s: %d단어 (%d초)\n", s.opponent, s.opponentScore, s.opponentTime);
+    if (s.challengerScore > s.opponentScore) {
+        printf("우승자: %s\n", s.challenger);
+    } else if (s.opponentScore > s.challengerScore) {
+        printf("우승자: %s\n", s.opponent);
+    } else {
+        if (s.challengerTime < s.opponentTime)
+            printf("우승자: %s\n", s.challenger);
+        else
+            printf("우승자: %s\n", s.opponent);
+    }
+}
+
+void doWordRelay() {
+    char challenger[MAX_NAME_LENGTH];
+    char opponent[MAX_NAME_LENGTH];
+    printf("도전자 닉네임 입력: ");
+    scanf("%s", challenger);
+    printf("대상자 닉네임 입력: ");
+    scanf("%s", opponent);
+    srand(time(NULL));
+    shuffleWord();
+    Score score;
+    copyWord(score.challenger, challenger);
+    copyWord(score.opponent, opponent);
+    score.challengerTime = playGame(challenger, &score.challengerScore);
+    score.opponentTime = playGame(opponent, &score.opponentScore);
+    displayWinner(score);
+}
