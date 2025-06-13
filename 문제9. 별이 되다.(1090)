@@ -1,0 +1,227 @@
+// debut.h
+#ifndef DEBUT_H
+#define DEBUT_H
+
+#define DATE_STR_LEN 9
+#define PLACE_MAX 64
+#define SHOWNAME_MAX 64
+#define REFLECT_MAX 256
+#define THANKS_MAX 128
+
+typedef struct SelfReflectionNode {
+    char date[DATE_STR_LEN];
+    char place[PLACE_MAX];
+    char showName[SHOWNAME_MAX];
+    char reflection[REFLECT_MAX];
+    char thanks[THANKS_MAX];
+    struct SelfReflectionNode *left;
+    struct SelfReflectionNode *right;
+} SelfReflectionNode;
+
+void searchTheHeart(void);
+
+#endif
+
+// debut.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include "debut.h"
+
+static SelfReflectionNode *root = NULL;
+
+static SelfReflectionNode *createNode(const char *date, const char *place, const char *showName, const char *reflection, const char *thanks) {
+    SelfReflectionNode *node = (SelfReflectionNode *)malloc(sizeof(SelfReflectionNode));
+    if (!node) return NULL;
+    strncpy(node->date, date, DATE_STR_LEN-1);
+    node->date[DATE_STR_LEN-1] = '\0';
+    strncpy(node->place, place, PLACE_MAX-1);
+    node->place[PLACE_MAX-1] = '\0';
+    strncpy(node->showName, showName, SHOWNAME_MAX-1);
+    node->showName[SHOWNAME_MAX-1] = '\0';
+    strncpy(node->reflection, reflection, REFLECT_MAX-1);
+    node->reflection[REFLECT_MAX-1] = '\0';
+    strncpy(node->thanks, thanks, THANKS_MAX-1);
+    node->thanks[THANKS_MAX-1] = '\0';
+    node->left = node->right = NULL;
+    return node;
+}
+
+static int dateCompare(const char *a, const char *b) {
+    return strcmp(a, b);
+}
+
+static SelfReflectionNode *insertNode(SelfReflectionNode *node, SelfReflectionNode *newNode) {
+    if (node == NULL) return newNode;
+    int cmp = dateCompare(newNode->date, node->date);
+    if (cmp < 0)
+        node->left = insertNode(node->left, newNode);
+    else if (cmp > 0)
+        node->right = insertNode(node->right, newNode);
+    else {
+        strncpy(node->place, newNode->place, PLACE_MAX);
+        strncpy(node->showName, newNode->showName, SHOWNAME_MAX);
+        strncpy(node->reflection, newNode->reflection, REFLECT_MAX);
+        strncpy(node->thanks, newNode->thanks, THANKS_MAX);
+        free(newNode);
+    }
+    return node;
+}
+
+static SelfReflectionNode *findMin(SelfReflectionNode *node) {
+    while (node && node->left) node = node->left;
+    return node;
+}
+
+static SelfReflectionNode *deleteNode(SelfReflectionNode *node, const char *date) {
+    if (node == NULL) return NULL;
+    int cmp = dateCompare(date, node->date);
+    if (cmp < 0) {
+        node->left = deleteNode(node->left, date);
+    } else if (cmp > 0) {
+        node->right = deleteNode(node->right, date);
+    } else {
+        if (!node->left) {
+            SelfReflectionNode *right = node->right;
+            free(node);
+            return right;
+        } else if (!node->right) {
+            SelfReflectionNode *left = node->left;
+            free(node);
+            return left;
+        } else {
+            SelfReflectionNode *minRight = findMin(node->right);
+            strncpy(node->date, minRight->date, DATE_STR_LEN);
+            strncpy(node->place, minRight->place, PLACE_MAX);
+            strncpy(node->showName, minRight->showName, SHOWNAME_MAX);
+            strncpy(node->reflection, minRight->reflection, REFLECT_MAX);
+            strncpy(node->thanks, minRight->thanks, THANKS_MAX);
+            node->right = deleteNode(node->right, minRight->date);
+        }
+    }
+    return node;
+}
+
+static SelfReflectionNode *searchNode(SelfReflectionNode *node, const char *date) {
+    if (node == NULL) return NULL;
+    int cmp = dateCompare(date, node->date);
+    if (cmp == 0) return node;
+    else if (cmp < 0) return searchNode(node->left, date);
+    else return searchNode(node->right, date);
+}
+
+static void inorderPrintDates(SelfReflectionNode *node) {
+    if (!node) return;
+    inorderPrintDates(node->left);
+    printf("%s\n", node->date);
+    inorderPrintDates(node->right);
+}
+
+static void printNodeData(SelfReflectionNode *node) {
+    if (!node) return;
+    printf("날짜: %s\n장소: %s\n공연명: %s\n자기 성찰: %s\n감사의 글: %s\n",
+        node->date, node->place, node->showName, node->reflection, node->thanks);
+}
+
+static void printCurrentMonthReflections(SelfReflectionNode *node, const char *curMMDD) {
+    if (!node) return;
+    printCurrentMonthReflections(node->left, curMMDD);
+    if (strncmp(node->date + 4, curMMDD, 4) == 0) {
+        printNodeData(node);
+        printf("\n");
+    }
+    printCurrentMonthReflections(node->right, curMMDD);
+}
+
+static void clearTree(SelfReflectionNode *node) {
+    if (!node) return;
+    clearTree(node->left);
+    clearTree(node->right);
+    free(node);
+}
+
+static void flushInput(void) {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF) {}
+}
+
+void searchTheHeart(void) {
+    char cmd;
+    printf("===== 자기 성찰 관리 프로그램 =====\n");
+    time_t t = time(NULL);
+    struct tm *tm = localtime(&t);
+    char currentMMDD[5];
+    snprintf(currentMMDD, 5, "%02d%02d", tm->tm_mon + 1, tm->tm_mday);
+    if (root) {
+        printf("=== 현재 월(%s) 공연 자기 성찰 목록 ===\n", currentMMDD);
+        printCurrentMonthReflections(root, currentMMDD);
+    }
+    while (1) {
+        printf("\n[입력(I), 출력(O), 탐색(S), 삭제(D), 종료(Q)] 선택: ");
+        cmd = getchar();
+        flushInput();
+        if (cmd == 'Q' || cmd == 'q') break;
+        switch (cmd) {
+            case 'I':
+            case 'i': {
+                char date[DATE_STR_LEN];
+                char place[PLACE_MAX];
+                char showName[SHOWNAME_MAX];
+                char reflection[REFLECT_MAX];
+                char thanks[THANKS_MAX];
+                printf("공연 날짜 (YYYYMMDD): ");
+                if (fgets(date, sizeof(date), stdin) == NULL) break;
+                date[strcspn(date, "\n")] = 0;
+                if (strlen(date) != 8) break;
+                printf("공연 장소: ");
+                if (fgets(place, sizeof(place), stdin) == NULL) break;
+                place[strcspn(place, "\n")] = 0;
+                printf("공연 명: ");
+                if (fgets(showName, sizeof(showName), stdin) == NULL) break;
+                showName[strcspn(showName, "\n")] = 0;
+                printf("자기 성찰 내용: ");
+                if (fgets(reflection, sizeof(reflection), stdin) == NULL) break;
+                reflection[strcspn(reflection, "\n")] = 0;
+                printf("감사의 글: ");
+                if (fgets(thanks, sizeof(thanks), stdin) == NULL) break;
+                thanks[strcspn(thanks, "\n")] = 0;
+                SelfReflectionNode *newNode = createNode(date, place, showName, reflection, thanks);
+                if (!newNode) break;
+                root = insertNode(root, newNode);
+                break;
+            }
+            case 'O':
+            case 'o':
+                if (!root) break;
+                inorderPrintDates(root);
+                break;
+            case 'S':
+            case 's': {
+                if (!root) break;
+                char date[DATE_STR_LEN];
+                printf("탐색할 공연 날짜 (YYYYMMDD): ");
+                if (fgets(date, sizeof(date), stdin) == NULL) break;
+                date[strcspn(date, "\n")] = 0;
+                SelfReflectionNode *found = searchNode(root, date);
+                if (found) printNodeData(found);
+                break;
+            }
+            case 'D':
+            case 'd': {
+                if (!root) break;
+                char date[DATE_STR_LEN];
+                printf("삭제할 공연 날짜 (YYYYMMDD): ");
+                if (fgets(date, sizeof(date), stdin) == NULL) break;
+                date[strcspn(date, "\n")] = 0;
+                root = deleteNode(root, date);
+                break;
+            }
+        }
+    }
+}
+
+void freeTree(void) {
+    clearTree(root);
+    root = NULL;
+}
