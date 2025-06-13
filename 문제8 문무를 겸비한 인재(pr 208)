@@ -1,0 +1,213 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <math.h>
+
+#define MAX_STUDENTS 100
+#define SUBJECT_COUNT 5
+
+typedef struct {
+    char name[30];
+    char nickname[30];
+    int age;
+    char gender;
+    int grade;
+} Student;
+
+typedef struct {
+    char nickname[30];
+    float weights[SUBJECT_COUNT];
+    float scores[SUBJECT_COUNT];
+    float avgScore;
+} LearningInfo;
+
+Student students[MAX_STUDENTS];
+LearningInfo learnings[MAX_STUDENTS];
+int studentCount = 0;
+
+const char* subjects[SUBJECT_COUNT] = {"English", "Math", "Korean", "Social", "Science"};
+
+void inputCommonLearningInfo() {
+    int i, j;
+    float totalWeight;
+    if(studentCount >= MAX_STUDENTS) return;
+    printf("학생 수 입력: ");
+    scanf("%d", &studentCount);
+    for(i = 0; i < studentCount; i++) {
+        printf("학생 이름 입력: ");
+        scanf("%s", students[i].name);
+        printf("학생 닉네임 입력: ");
+        scanf("%s", students[i].nickname);
+        printf("나이 입력: ");
+        scanf("%d", &students[i].age);
+        printf("성별 입력(M/F): ");
+        scanf(" %c", &students[i].gender);
+        students[i].grade = students[i].age - 6;
+        if(students[i].grade < 1) students[i].grade = 1;
+        if(students[i].grade > 12) students[i].grade = 12;
+
+        strcpy(learnings[i].nickname, students[i].nickname);
+        totalWeight = 0.0f;
+        for(j = 0; j < SUBJECT_COUNT; j++) {
+            printf("%s 점수 입력: ", subjects[j]);
+            scanf("%f", &learnings[i].scores[j]);
+            do {
+                printf("%s 가중치 입력(0.0~1.0): ", subjects[j]);
+                scanf("%f", &learnings[i].weights[j]);
+            } while(learnings[i].weights[j] < 0.0f || learnings[i].weights[j] > 1.0f);
+            totalWeight += learnings[i].weights[j];
+        }
+        if(fabs(totalWeight - 1.0f) > 0.01f) {
+            printf("가중치 합은 1.0이어야 합니다. 다시 입력하세요.\n");
+            i--;
+            continue;
+        }
+        float weightedSum = 0.0f;
+        for(j = 0; j < SUBJECT_COUNT; j++) {
+            weightedSum += learnings[i].scores[j] * learnings[i].weights[j];
+        }
+        learnings[i].avgScore = roundf(weightedSum * 10) / 10.0f;
+    }
+}
+
+void printStudentInfo() {
+    int i, j;
+    for(i = 0; i < studentCount - 1; i++) {
+        for(j = i + 1; j < studentCount; j++) {
+            if(strcmp(learnings[i].nickname, learnings[j].nickname) < 0) {
+                Student tempS = students[i];
+                students[i] = students[j];
+                students[j] = tempS;
+                LearningInfo tempL = learnings[i];
+                learnings[i] = learnings[j];
+                learnings[j] = tempL;
+            }
+        }
+    }
+    for(i = 0; i < studentCount; i++) {
+        printf("이름: %s, 닉네임: %s, 나이: %d, 성별: %c, 학년: %d\n",
+            students[i].name, students[i].nickname, students[i].age, students[i].gender, students[i].grade);
+    }
+}
+
+void printAscendAvgGrade() {
+    int i, j;
+    for(i = 0; i < studentCount - 1; i++) {
+        for(j = i + 1; j < studentCount; j++) {
+            if(learnings[i].avgScore > learnings[j].avgScore) {
+                Student tempS = students[i];
+                students[i] = students[j];
+                students[j] = tempS;
+                LearningInfo tempL = learnings[i];
+                learnings[i] = learnings[j];
+                learnings[j] = tempL;
+            }
+        }
+    }
+    for(i = 0; i < studentCount; i++) {
+        printf("닉네임: %s, 평균 성적: %.1f\n", learnings[i].nickname, learnings[i].avgScore);
+    }
+}
+
+void printDescendHighWeightGrade() {
+    int maxIdx = 0, i, j;
+    float maxWeight = 0.0f;
+    for(i = 0; i < SUBJECT_COUNT; i++) {
+        float maxW = 0.0f;
+        for(j = 0; j < studentCount; j++) {
+            if(learnings[j].weights[i] > maxW) {
+                maxW = learnings[j].weights[i];
+            }
+        }
+        if(maxW > maxWeight) {
+            maxWeight = maxW;
+            maxIdx = i;
+        }
+    }
+    for(i = 0; i < studentCount - 1; i++) {
+        for(j = i + 1; j < studentCount; j++) {
+            if(learnings[i].scores[maxIdx] < learnings[j].scores[maxIdx]) {
+                Student tempS = students[i];
+                students[i] = students[j];
+                students[j] = tempS;
+                LearningInfo tempL = learnings[i];
+                learnings[i] = learnings[j];
+                learnings[j] = tempL;
+            }
+        }
+    }
+    printf("가중치가 가장 높은 과목: %s\n", subjects[maxIdx]);
+    for(i = 0; i < studentCount; i++) {
+        printf("닉네임: %s, 점수: %.1f\n", learnings[i].nickname, learnings[i].scores[maxIdx]);
+    }
+}
+
+void printExcludeMaxMinGrade() {
+    int sub;
+    printf("출력할 과목 선택 (0:English, 1:Math, 2:Korean, 3:Social, 4:Science): ");
+    scanf("%d", &sub);
+    if(sub < 0 || sub >= SUBJECT_COUNT) {
+        printf("잘못된 선택입니다.\n");
+        return;
+    }
+    float max = learnings[0].scores[sub], min = learnings[0].scores[sub];
+    int i;
+    for(i = 1; i < studentCount; i++) {
+        if(learnings[i].scores[sub] > max) max = learnings[i].scores[sub];
+        if(learnings[i].scores[sub] < min) min = learnings[i].scores[sub];
+    }
+    for(i = 0; i < studentCount; i++) {
+        if(learnings[i].scores[sub] != max && learnings[i].scores[sub] != min) {
+            printf("닉네임: %s, 점수: %.1f\n", learnings[i].nickname, learnings[i].scores[sub]);
+        }
+    }
+}
+
+void obscureName(const char* name) {
+    int i;
+    for(i = 0; name[i] != '\0'; i++) {
+        printf("%d ", (unsigned char)name[i]);
+    }
+    printf("\n");
+}
+
+void obscureNickname(const char* nickname) {
+    int len = strlen(nickname);
+    int i;
+    for(i = len - 1; i >= 0; i--) {
+        putchar(nickname[i]);
+    }
+    putchar('\n');
+}
+
+void inquiryCommonLearningInfo() {
+    int choice;
+    while(1) {
+        printf("[1] 닉네임 내림차순 출력\n");
+        printf("[2] 평균 성적 오름차순 출력\n");
+        printf("[3] 가중치 높은 과목 점수 내림차순 출력\n");
+        printf("[4] 과목 선택 후 최대/최소 제외 출력\n");
+        printf("[5] 종료\n");
+        printf("선택: ");
+        scanf("%d", &choice);
+        if(choice == 1) {
+            int i;
+            for(i = 0; i < studentCount; i++) {
+                obscureName(students[i].name);
+                obscureNickname(students[i].nickname);
+            }
+            printStudentInfo();
+        } else if(choice == 2) {
+            printAscendAvgGrade();
+        } else if(choice == 3) {
+            printDescendHighWeightGrade();
+        } else if(choice == 4) {
+            printExcludeMaxMinGrade();
+        } else if(choice == 5) {
+            break;
+        } else {
+            printf("잘못된 선택입니다.\n");
+        }
+    }
+}
