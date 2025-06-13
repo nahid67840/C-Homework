@@ -1,0 +1,179 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define MAX_MAKEUP_TYPE_LEN 64
+#define MAX_MAKEUP_DESC_LEN 128
+#define MAX_MAKEUP_TYPES 10
+#define QUEUE_CAPACITY 100
+
+typedef struct {
+    char gender;
+    char type[MAX_MAKEUP_TYPE_LEN];
+    char description[MAX_MAKEUP_DESC_LEN];
+    int duration;
+} MakeupType;
+
+typedef struct {
+    int id;
+    int arrivalTime;
+    MakeupType *selectedType;
+    int duration;
+} Trainee;
+
+typedef struct {
+    Trainee *queue[QUEUE_CAPACITY];
+    int front;
+    int rear;
+    int size;
+} CircularQueue;
+
+void initQueue(CircularQueue *q) {
+    q->front = 0;
+    q->rear = 0;
+    q->size = 0;
+}
+
+int isQueueEmpty(CircularQueue *q) {
+    return q->size == 0;
+}
+
+int isQueueFull(CircularQueue *q) {
+    return q->size == QUEUE_CAPACITY;
+}
+
+int enqueue(CircularQueue *q, Trainee *t) {
+    if (isQueueFull(q)) return 0;
+    q->queue[q->rear] = t;
+    q->rear = (q->rear + 1) % QUEUE_CAPACITY;
+    q->size++;
+    return 1;
+}
+
+Trainee* dequeue(CircularQueue *q) {
+    if (isQueueEmpty(q)) return NULL;
+    Trainee *t = q->queue[q->front];
+    q->front = (q->front + 1) % QUEUE_CAPACITY;
+    q->size--;
+    return t;
+}
+
+int loadMakeupTypes(const char *filename, MakeupType **types, int *count) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0;
+    char line[256];
+    int idx = 0;
+    MakeupType *arr = malloc(sizeof(MakeupType) * MAX_MAKEUP_TYPES);
+    while (fgets(line, sizeof(line), fp) && idx < MAX_MAKEUP_TYPES) {
+        char gender;
+        char type[MAX_MAKEUP_TYPE_LEN], desc[MAX_MAKEUP_DESC_LEN];
+        if (sscanf(line, " %c , %[^,] , %[^\n]", &gender, type, desc) != 3) continue;
+        arr[idx].gender = gender;
+        strncpy(arr[idx].type, type, MAX_MAKEUP_TYPE_LEN-1);
+        arr[idx].type[MAX_MAKEUP_TYPE_LEN-1] = '\0';
+        strncpy(arr[idx].description, desc, MAX_MAKEUP_DESC_LEN-1);
+        arr[idx].description[MAX_MAKEUP_DESC_LEN-1] = '\0';
+        arr[idx].duration = 0;
+        idx++;
+    }
+    fclose(fp);
+    *types = arr;
+    *count = idx;
+    return 1;
+}
+
+void printStatus(int currentTime, Trainee *inMakeup, CircularQueue *waitingQueue,
+                 int totalMaleWait, int totalFemaleWait, int totalWait) {
+    printf("현재 시간: %d분\n", currentTime);
+    if (inMakeup) {
+        int waitingTime = currentTime - inMakeup->arrivalTime;
+        printf("메이크업 중: 연습생ID=%d, 성별=%c, 유형=%s, 소요시간=%d분, 대기시간=%d분\n",
+            inMakeup->id, (inMakeup->id % 2 == 1) ? 'M' : 'F',
+            inMakeup->selectedType->type, inMakeup->duration, waitingTime);
+    } else {
+        printf("현재 메이크업 진행중인 연습생 없음\n");
+    }
+    printf("대기 중 연습생 수: %d\n", waitingQueue->size);
+    printf("전체 대기 시간(누적): %d분, 남성 대기 시간: %d분, 여성 대기 시간: %d분\n",
+           totalWait, totalMaleWait, totalFemaleWait);
+    printf("=============================================\n");
+}
+
+void testMakeUp() {
+    MakeupType *makeupTypes = NULL;
+    int makeupCount = 0;
+    if (!loadMakeupTypes("makeup.txt", &makeupTypes, &makeupCount)) {
+        printf("메이크업 유형 파일을 읽는데 실패했습니다.\n");
+        return;
+    }
+    CircularQueue waitingQueue;
+    initQueue(&waitingQueue);
+
+    Trainee *inMakeup = NULL;
+    int currentTime = 0;
+    int nextTraineeId = 1;
+
+    int totalMaleWait = 0;
+    int totalFemaleWait = 0;
+    int totalWait = 0;
+
+    srand((unsigned int)time(NULL));
+
+    for (currentTime = 0; currentTime <= 60; currentTime++) {
+        int r = rand() % 11;
+        if (r < 3) {
+            Trainee *newTrainee = malloc(sizeof(Trainee));
+            newTrainee->id = nextTraineeId++;
+            newTrainee->arrivalTime = currentTime;
+
+            char gender = (newTrainee->id % 2 == 1) ? 'M' : 'F';
+
+            MakeupType *candidates[MAX_MAKEUP_TYPES];
+            int candidateCount = 0;
+            for (int i = 0; i < makeupCount; i++) {
+                if (makeupTypes[i].gender == gender) {
+                    candidates[candidateCount++] = &makeupTypes[i];
+                }
+            }
+            if (candidateCount == 0) {
+                free(newTrainee);
+                continue;
+            }
+            int chosenIdx = rand() % candidateCount;
+            newTrainee->selectedType = candidates[chosenIdx];
+            newTrainee->duration = (rand() % 4) + 3;
+
+            if (inMakeup == NULL) {
+                inMakeup = newTrainee;
+            } else {
+                if (!enqueue(&waitingQueue, newTrainee)) {
+                    free(newTrainee);
+                }
+            }
+        }
+
+        if (inMakeup) {
+            if (currentTime - inMakeup->arrivalTime >= inMakeup->duration) {
+                free(inMakeup);
+                inMakeup = NULL;
+            }
+        }
+
+        if (inMakeup == NULL && !isQueueEmpty(&waitingQueue)) {
+            inMakeup = dequeue(&waitingQueue);
+            int waitTime = currentTime - inMakeup->arrivalTime;
+            totalWait += waitTime;
+            if (inMakeup->id % 2 == 1) totalMaleWait += waitTime;
+            else totalFemaleWait += waitTime;
+        }
+
+        printStatus(currentTime, inMakeup, &waitingQueue, totalMaleWait, totalFemaleWait, totalWait);
+    }
+
+    while (!isQueueEmpty(&waitingQueue)) {
+        Trainee *t = dequeue(&waitingQueue);
+        free(t);
+    }
+    free(makeupTypes);
+}
