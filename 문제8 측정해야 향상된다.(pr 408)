@@ -1,0 +1,118 @@
+#include <stdio.h>
+#include <string.h>
+
+#define MAX_TEAM_NAME 50
+#define MAX_RESULT_STR 10
+
+typedef struct {
+    int avgScoreLimit;
+    int minScoreLimit;
+    int timeLimit;
+} TeamBaseline;
+
+typedef struct {
+    char teamName[MAX_TEAM_NAME];
+    float avgScore;
+    int minScore;
+    int totalTime;
+    char result[MAX_RESULT_STR];
+} TeamPerformance;
+
+void inputBaseLine(TeamBaseline *baseline, int maxScore, int minTimePerPerson, int maxTimePerPerson, int teamSize) {
+    int avg, min, time;
+    printf("팀 기준 평균 점수 입력 (최대 %d): ", maxScore);
+    scanf("%d", &avg);
+    if (avg > maxScore) avg = maxScore;
+    printf("팀원 최소 점수 입력 (최대 %d): ", maxScore);
+    scanf("%d", &min);
+    if (min > maxScore) min = maxScore;
+    printf("팀 완료 시간 입력 (분) [%d ~ %d]: ", minTimePerPerson * teamSize, maxTimePerPerson * teamSize);
+    scanf("%d", &time);
+    if (time < minTimePerPerson * teamSize) time = minTimePerPerson * teamSize;
+    else if (time > maxTimePerPerson * teamSize) time = maxTimePerPerson * teamSize;
+    baseline->avgScoreLimit = avg;
+    baseline->minScoreLimit = min;
+    baseline->timeLimit = time;
+}
+
+void evalTeamPerformance(TeamPerformance *perf, int *scores, int *times, int teamSize, TeamBaseline baseline) {
+    int i, totalScore = 0, minScore = 1000, totalTime = 0;
+    for (i = 0; i < teamSize; i++) {
+        totalScore += scores[i];
+        if (scores[i] < minScore) minScore = scores[i];
+        totalTime += times[i];
+    }
+    perf->avgScore = (float)totalScore / teamSize;
+    perf->minScore = minScore;
+    perf->totalTime = totalTime;
+    if (perf->avgScore >= baseline.avgScoreLimit &&
+        perf->minScore >= baseline.minScoreLimit &&
+        perf->totalTime <= baseline.timeLimit)
+        strcpy(perf->result, "Pass");
+    else
+        strcpy(perf->result, "Fail");
+}
+
+void learnHangul() {
+    int teamSize;
+    printf("학습자 수 입력: ");
+    scanf("%d", &teamSize);
+    char teamName[MAX_TEAM_NAME];
+    printf("팀 이름 입력: ");
+    scanf("%s", teamName);
+    TeamBaseline baseline;
+    inputBaseLine(&baseline, 300, 10, 30, teamSize);
+    int scores[teamSize];
+    int times[teamSize];
+    for (int i = 0; i < teamSize; i++) {
+        int score1, score2, time1, time2;
+        printf("학습자 %d 점수1 입력: ", i+1);
+        scanf("%d", &score1);
+        printf("학습자 %d 점수2 입력: ", i+1);
+        scanf("%d", &score2);
+        scores[i] = score1 + score2;
+        printf("학습자 %d 수행 시간1 입력(분): ", i+1);
+        scanf("%d", &time1);
+        printf("학습자 %d 수행 시간2 입력(분): ", i+1);
+        scanf("%d", &time2);
+        times[i] = time1 + time2;
+    }
+    TeamPerformance perf;
+    strncpy(perf.teamName, teamName, MAX_TEAM_NAME);
+    evalTeamPerformance(&perf, scores, times, teamSize, baseline);
+    printf("\n--- 팀 %s 최종 결과 ---\n", perf.teamName);
+    printf("평균 점수: %.2f\n", perf.avgScore);
+    printf("최소 점수: %d\n", perf.minScore);
+    printf("총 수행 시간: %d 분\n", perf.totalTime);
+    printf("최종 결과: %s\n", perf.result);
+}
+
+void learnKoreanGrammar() {
+    int teamSize;
+    printf("학습자 수 입력: ");
+    scanf("%d", &teamSize);
+    char teamName[MAX_TEAM_NAME];
+    printf("팀 이름 입력: ");
+    scanf("%s", teamName);
+    TeamBaseline baseline;
+    inputBaseLine(&baseline, 100, 10, 20, teamSize);
+    int scores[teamSize];
+    int times[teamSize];
+    for (int i = 0; i < teamSize; i++) {
+        int score, time;
+        printf("학습자 %d 문장 구성 점수 입력: ", i+1);
+        scanf("%d", &score);
+        scores[i] = score;
+        printf("학습자 %d 수행 시간 입력(분): ", i+1);
+        scanf("%d", &time);
+        times[i] = time;
+    }
+    TeamPerformance perf;
+    strncpy(perf.teamName, teamName, MAX_TEAM_NAME);
+    evalTeamPerformance(&perf, scores, times, teamSize, baseline);
+    printf("\n--- 팀 %s 최종 결과 ---\n", perf.teamName);
+    printf("평균 점수: %.2f\n", perf.avgScore);
+    printf("최소 점수: %d\n", perf.minScore);
+    printf("총 수행 시간: %d 분\n", perf.totalTime);
+    printf("최종 결과: %s\n", perf.result);
+}
