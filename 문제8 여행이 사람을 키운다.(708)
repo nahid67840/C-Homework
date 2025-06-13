@@ -1,0 +1,187 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define AIRPORT_CODE_LEN 3
+#define INITIAL_TICKET_CAPACITY 20
+#define INITIAL_PATH_CAPACITY 50
+
+typedef struct {
+    char depart[AIRPORT_CODE_LEN + 1];
+    char arrive[AIRPORT_CODE_LEN + 1];
+    int used;
+} Ticket;
+
+typedef struct {
+    Ticket *tickets;
+    int size;
+    int capacity;
+} Tickets;
+
+typedef struct {
+    char **path;
+    int size;
+    int capacity;
+} TravelPath;
+
+int initTickets(Tickets *tks) {
+    tks->tickets = malloc(sizeof(Ticket) * INITIAL_TICKET_CAPACITY);
+    if (!tks->tickets) return 0;
+    tks->size = 0;
+    tks->capacity = INITIAL_TICKET_CAPACITY;
+    return 1;
+}
+
+void freeTickets(Tickets *tks) {
+    if (tks->tickets) free(tks->tickets);
+    tks->tickets = NULL;
+    tks->size = 0;
+    tks->capacity = 0;
+}
+
+int addTicket(Tickets *tks, const char *depart, const char *arrive) {
+    if (tks->size >= tks->capacity) {
+        Ticket *tmp = realloc(tks->tickets, sizeof(Ticket) * (tks->capacity * 2));
+        if (!tmp) return 0;
+        tks->tickets = tmp;
+        tks->capacity *= 2;
+    }
+    strncpy(tks->tickets[tks->size].depart, depart, AIRPORT_CODE_LEN);
+    tks->tickets[tks->size].depart[AIRPORT_CODE_LEN] = '\0';
+    strncpy(tks->tickets[tks->size].arrive, arrive, AIRPORT_CODE_LEN);
+    tks->tickets[tks->size].arrive[AIRPORT_CODE_LEN] = '\0';
+    tks->tickets[tks->size].used = 0;
+    tks->size++;
+    return 1;
+}
+
+int loadTickets(const char *filename, Tickets *tks) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0;
+    char line[128];
+    while (fgets(line, sizeof(line), fp)) {
+        if (strchr(line, ',') == NULL) continue;
+        char depart[AIRPORT_CODE_LEN + 1], arrive[AIRPORT_CODE_LEN + 1];
+        char *token = strtok(line, ",");
+        if (!token) continue;
+        strncpy(depart, token, AIRPORT_CODE_LEN);
+        depart[AIRPORT_CODE_LEN] = '\0';
+        token = strtok(NULL, ",\r\n");
+        if (!token) continue;
+        strncpy(arrive, token, AIRPORT_CODE_LEN);
+        arrive[AIRPORT_CODE_LEN] = '\0';
+        if (!addTicket(tks, depart, arrive)) {
+            fclose(fp);
+            return 0;
+        }
+    }
+    fclose(fp);
+    return 1;
+}
+
+int initTravelPath(TravelPath *tp) {
+    tp->path = malloc(sizeof(char *) * INITIAL_PATH_CAPACITY);
+    if (!tp->path) return 0;
+    tp->size = 0;
+    tp->capacity = INITIAL_PATH_CAPACITY;
+    return 1;
+}
+
+void freeTravelPath(TravelPath *tp) {
+    if (tp->path) {
+        for (int i = 0; i < tp->size; i++) {
+            free(tp->path[i]);
+        }
+        free(tp->path);
+    }
+    tp->path = NULL;
+    tp->size = 0;
+    tp->capacity = 0;
+}
+
+int addAirportToPath(TravelPath *tp, const char *airport) {
+    if (tp->size >= tp->capacity) {
+        char **tmp = realloc(tp->path, sizeof(char *) * (tp->capacity * 2));
+        if (!tmp) return 0;
+        tp->path = tmp;
+        tp->capacity *= 2;
+    }
+    tp->path[tp->size] = malloc(AIRPORT_CODE_LEN + 1);
+    if (!tp->path[tp->size]) return 0;
+    strncpy(tp->path[tp->size], airport, AIRPORT_CODE_LEN);
+    tp->path[tp->size][AIRPORT_CODE_LEN] = '\0';
+    tp->size++;
+    return 1;
+}
+
+int foundPath = 0;
+
+int compareTickets(const void *a, const void *b) {
+    const Ticket *t1 = (const Ticket *)a;
+    const Ticket *t2 = (const Ticket *)b;
+    int cmp = strcmp(t1->depart, t2->depart);
+    if (cmp == 0) return strcmp(t1->arrive, t2->arrive);
+    return cmp;
+}
+
+void dfs(Tickets *tks, TravelPath *path, int usedCount) {
+    if (foundPath) return;
+    if (usedCount == tks->size) {
+        foundPath = 1;
+        return;
+    }
+    char *currentAirport = path->path[path->size - 1];
+    for (int i = 0; i < tks->size; i++) {
+        if (!tks->tickets[i].used && strcmp(tks->tickets[i].depart, currentAirport) == 0) {
+            tks->tickets[i].used = 1;
+            if (!addAirportToPath(path, tks->tickets[i].arrive)) {
+                tks->tickets[i].used = 0;
+                return;
+            }
+            dfs(tks, path, usedCount + 1);
+            if (foundPath) return;
+            tks->tickets[i].used = 0;
+            free(path->path[path->size - 1]);
+            path->size--;
+        }
+    }
+}
+
+void planOverseasTraining() {
+    Tickets tickets;
+    if (!initTickets(&tickets)) {
+        printf("메모리 할당 실패\n");
+        return;
+    }
+    if (!loadTickets("tickets.txt", &tickets)) {
+        printf("항공권 파일을 읽는데 실패했습니다.\n");
+        freeTickets(&tickets);
+        return;
+    }
+    qsort(tickets.tickets, tickets.size, sizeof(Ticket), compareTickets);
+    TravelPath path;
+    if (!initTravelPath(&path)) {
+        printf("메모리 할당 실패\n");
+        freeTickets(&tickets);
+        return;
+    }
+    if (!addAirportToPath(&path, "ICN")) {
+        printf("메모리 할당 실패\n");
+        freeTravelPath(&path);
+        freeTickets(&tickets);
+        return;
+    }
+    foundPath = 0;
+    dfs(&tickets, &path, 0);
+    if (foundPath) {
+        printf("여행 경로:\n");
+        for (int i = 0; i < path.size; i++) {
+            printf("%s ", path.path[i]);
+        }
+        printf("\n");
+    } else {
+        printf("사용 가능한 모든 항공권을 사용하여 여행 경로를 찾을 수 없습니다.\n");
+    }
+    freeTravelPath(&path);
+    freeTickets(&tickets);
+}
