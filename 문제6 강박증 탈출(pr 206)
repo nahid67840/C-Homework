@@ -1,0 +1,181 @@
+#include <stdio.h>
+
+#define MAX 100
+
+/* ==== Stack 자료 구조 ==== */
+typedef struct {
+    int calories[MAX];
+    int top;
+} CalorieStack;
+
+void initStack(CalorieStack *stack) {
+    stack->top = -1;
+}
+
+int isStackEmpty(CalorieStack *stack) {
+    return stack->top == -1;
+}
+
+int isStackFull(CalorieStack *stack) {
+    return stack->top == MAX - 1;
+}
+
+int push(CalorieStack *stack, int calorie) {
+    if (isStackFull(stack)) {
+        printf("스택이 가득 찼습니다.\n");
+        return 0;
+    }
+    stack->calories[++(stack->top)] = calorie;
+    return 1;
+}
+
+int pop(CalorieStack *stack) {
+    if (isStackEmpty(stack)) {
+        printf("스택이 비어 있습니다.\n");
+        return -1;
+    }
+    return stack->calories[(stack->top)--];
+}
+
+
+/* ==== Queue 자료 구조 ==== */
+typedef struct {
+    int calories[MAX];
+    int front, rear;
+} CalorieQueue;
+
+void initQueue(CalorieQueue *queue) {
+    queue->front = 0;
+    queue->rear = -1;
+}
+
+int isQueueEmpty(CalorieQueue *queue) {
+    return queue->front > queue->rear;
+}
+
+int isQueueFull(CalorieQueue *queue) {
+    return queue->rear == MAX - 1;
+}
+
+int enqueue(CalorieQueue *queue, int calorie) {
+    if (isQueueFull(queue)) {
+        printf("큐가 가득 찼습니다.\n");
+        return 0;
+    }
+    queue->calories[++(queue->rear)] = calorie;
+    return 1;
+}
+
+int dequeue(CalorieQueue *queue) {
+    if (isQueueEmpty(queue)) {
+        printf("큐가 비어 있습니다.\n");
+        return -1;
+    }
+    return queue->calories[(queue->front)++];
+}
+
+
+/* ==== 운동 매핑 ==== */
+typedef struct {
+    int id;
+    const char *description;
+    int caloriesBurned;
+} Exercise;
+
+Exercise exercises[] = {
+    {1, "30분 빠른 걷기 또는 조깅", 200},
+    {2, "전신 근력 운동", 250},
+    {3, "30분 수영 또는 사이클링", 300},
+    {4, "30분 스트레칭 및 요가", 150},
+    {5, "30분 무용 또는 에어로빅", 250},
+    {6, "테니스, 배드민턴, 댄스", 300},
+    {7, "가벼운 산책", 100}
+};
+
+int getExerciseCalorie(int choice) {
+    int i;
+    for (i = 0; i < sizeof(exercises)/sizeof(Exercise); i++) {
+        if (exercises[i].id == choice) {
+            return exercises[i].caloriesBurned;
+        }
+    }
+    return -1;
+}
+
+
+/* ==== 칼로리 관리 함수 (Stack 기반) ==== */
+void mngMyDailyCalorie_Stack(CalorieStack *stack) {
+    if (isStackEmpty(stack)) {
+        printf("식단 기록이 비어 있습니다.\n");
+        return;
+    }
+
+    printf("\n운동 종류를 선택하세요:\n");
+    for (int i = 0; i < 7; i++) {
+        printf("%d. %s (%d kcal)\n", exercises[i].id, exercises[i].description, exercises[i].caloriesBurned);
+    }
+    printf("선택: ");
+    int choice;
+    scanf("%d", &choice);
+
+    int burned = getExerciseCalorie(choice);
+    if (burned == -1) {
+        printf("잘못된 선택입니다.\n");
+        return;
+    }
+
+    int topCalories = stack->calories[stack->top];
+    if (burned >= topCalories) {
+        printf("운동으로 %d kcal 소모. %d kcal 식단 제거됨.\n", burned, topCalories);
+        pop(stack);
+    } else {
+        printf("운동량 부족: %d kcal 더 필요함.\n", topCalories - burned);
+    }
+
+    printf("남은 기록:\n");
+    int total = 0;
+    for (int i = 0; i <= stack->top; i++) {
+        printf(" - %d kcal\n", stack->calories[i]);
+        total += stack->calories[i];
+    }
+    printf("총 남은 칼로리: %d kcal\n", total);
+}
+
+
+/* ==== 칼로리 관리 함수 (Queue 기반 - 보너스) ==== */
+void mngMyDailyCalorie_Queue(CalorieQueue *queue) {
+    if (isQueueEmpty(queue)) {
+        printf("식단 기록이 비어 있습니다.\n");
+        return;
+    }
+
+    printf("\n운동 종류를 선택하세요:\n");
+    for (int i = 0; i < 7; i++) {
+        printf("%d. %s (%d kcal)\n", exercises[i].id, exercises[i].description, exercises[i].caloriesBurned);
+    }
+    printf("선택: ");
+    int choice;
+    scanf("%d", &choice);
+
+    int burned = getExerciseCalorie(choice);
+    if (burned == -1) {
+        printf("잘못된 선택입니다.\n");
+        return;
+    }
+
+    int frontCalories = queue->calories[queue->front];
+    if (burned >= frontCalories) {
+        printf("운동으로 %d kcal 소모. %d kcal 식단 제거됨.\n", burned, frontCalories);
+        dequeue(queue);
+    } else {
+        printf("운동량 부족: %d kcal 더 필요함.\n", frontCalories - burned);
+    }
+
+    printf("남은 기록:\n");
+    int total = 0;
+    for (int i = queue->front; i <= queue->rear; i++) {
+        printf(" - %d kcal\n", queue->calories[i]);
+        total += queue->calories[i];
+    }
+    printf("총 남은 칼로리: %d kcal\n", total);
+}
