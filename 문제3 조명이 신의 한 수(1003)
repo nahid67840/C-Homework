@@ -1,0 +1,120 @@
+#ifndef DEBUT_H
+#define DEBUT_H
+typedef struct Light {
+    int id;
+    int x1, y1;
+    int x2, y2;
+    struct Light* next;
+} Light;
+void handleLighting(void);
+#endif
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "debut.h"
+
+static Light* lightHead = NULL;
+
+Light* createLight(int id, int x1, int y1, int x2, int y2) {
+    Light* node = (Light*)malloc(sizeof(Light));
+    if (!node) exit(EXIT_FAILURE);
+    node->id = id;
+    node->x1 = x1; node->y1 = y1;
+    node->x2 = x2; node->y2 = y2;
+    node->next = NULL;
+    return node;
+}
+
+void addLight(Light* light) {
+    if (!lightHead) {
+        lightHead = light;
+        return;
+    }
+    Light* cur = lightHead;
+    while (cur->next) cur = cur->next;
+    cur->next = light;
+}
+
+void freeLights() {
+    Light* cur = lightHead;
+    while (cur) {
+        Light* tmp = cur;
+        cur = cur->next;
+        free(tmp);
+    }
+    lightHead = NULL;
+}
+
+void initLights() {
+    freeLights();
+    addLight(createLight(1,1,8,4,5));
+    addLight(createLight(2,3,2,13,6));
+    addLight(createLight(3,7,10,12,7));
+    addLight(createLight(4,5,8,8,4));
+    addLight(createLight(5,9,1,2,5));
+}
+
+void printRange() {
+    if (!lightHead) return;
+    int minX=lightHead->x1 < lightHead->x2 ? (lightHead->x1 < lightHead->x2 ? lightHead->x1 : lightHead->x2) : (lightHead->x2 < lightHead->x1 ? lightHead->x2 : lightHead->x1);
+    int minY=lightHead->y1 < lightHead->y2 ? (lightHead->y1 < lightHead->y2 ? lightHead->y1 : lightHead->y2) : (lightHead->y2 < lightHead->y1 ? lightHead->y2 : lightHead->y1);
+    int maxX=lightHead->x1 > lightHead->x2 ? (lightHead->x1 > lightHead->x2 ? lightHead->x1 : lightHead->x2) : (lightHead->x2 > lightHead->x1 ? lightHead->x2 : lightHead->x1);
+    int maxY=lightHead->y1 > lightHead->y2 ? (lightHead->y1 > lightHead->y2 ? lightHead->y1 : lightHead->y2) : (lightHead->y2 > lightHead->y1 ? lightHead->y2 : lightHead->y1);
+
+    for (Light* cur=lightHead->next; cur; cur=cur->next) {
+        int curMinX = cur->x1 < cur->x2 ? cur->x1 : cur->x2;
+        int curMinY = cur->y1 < cur->y2 ? cur->y1 : cur->y2;
+        int curMaxX = cur->x1 > cur->x2 ? cur->x1 : cur->x2;
+        int curMaxY = cur->y1 > cur->y2 ? cur->y1 : cur->y2;
+        if (curMinX < minX) minX = curMinX;
+        if (curMinY < minY) minY = curMinY;
+        if (curMaxX > maxX) maxX = curMaxX;
+        if (curMaxY > maxY) maxY = curMaxY;
+    }
+    printf("위치 입력 범위: (%d,%d) ~ (%d,%d)\n", minX, minY, maxX, maxY);
+}
+
+int isInLight(Light* l, int x, int y) {
+    int xmin = l->x1 < l->x2 ? l->x1 : l->x2;
+    int xmax = l->x1 > l->x2 ? l->x1 : l->x2;
+    int ymin = l->y1 < l->y2 ? l->y1 : l->y2;
+    int ymax = l->y1 > l->y2 ? l->y1 : l->y2;
+    return (x >= xmin && x <= xmax && y >= ymin && y <= ymax);
+}
+
+void handleLighting() {
+    initLights();
+    printRange();
+    printf("현재 위치를 입력하세요 (X,Y): ");
+    int x, y;
+    if (scanf("%d,%d", &x, &y) != 2) {
+        printf("잘못된 입력입니다.\n");
+        return;
+    }
+    printf("조명에 영향을 받는 조명 번호와 좌표:\n");
+    int found = 0;
+    for (Light* cur = lightHead; cur != NULL; cur = cur->next) {
+        if (isInLight(cur, x, y)) {
+            printf("조명 %d: (%d,%d) ~ (%d,%d)\n", cur->id, cur->x1, cur->y1, cur->x2, cur->y2);
+            found = 1;
+        }
+    }
+    if (!found) printf("영향 받는 조명이 없습니다.\n");
+
+    printf("조명 정보를 추가하시겠습니까? (y/n): ");
+    char c = getchar();
+    if (c == '\n') c = getchar();
+    if (c == 'y' || c == 'Y') {
+        int newId = 1;
+        for (Light* cur = lightHead; cur != NULL; cur = cur->next) if (cur->id >= newId) newId = cur->id + 1;
+        int x1, y1, x2, y2;
+        printf("추가할 조명의 좌표를 입력하세요 (x1,y1,x2,y2): ");
+        if (scanf("%d,%d,%d,%d", &x1, &y1, &x2, &y2) == 4) {
+            addLight(createLight(newId, x1, y1, x2, y2));
+            printf("조명 %d가 추가되었습니다.\n", newId);
+        } else {
+            printf("잘못된 입력입니다.\n");
+        }
+    }
+}
