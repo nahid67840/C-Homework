@@ -1,0 +1,151 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <ctype.h>
+
+#define WORD_BANK_SIZE 10
+#define RANDOM_WORDS 5
+#define MAX_WORD_LEN 6
+#define MAX_INPUT_LEN 256
+#define MAX_RETRIES 2
+
+char wordBank[WORD_BANK_SIZE][MAX_WORD_LEN];
+int wordBankCount = 0;
+
+void inputWordBank() {
+    int i;
+    char temp[MAX_WORD_LEN];
+    printf("단어집에 3~5글자 단어를 최대 10개 입력하세요.\n");
+    for(i = 0; i < WORD_BANK_SIZE; i++) {
+        printf("%d번째 단어 입력: ", i+1);
+        scanf("%s", temp);
+        int len = strlen(temp);
+        if(len < 3 || len > 5) {
+            printf("3~5글자 단어만 입력 가능합니다.\n");
+            i--;
+            continue;
+        }
+        strcpy(wordBank[i], temp);
+    }
+    wordBankCount = WORD_BANK_SIZE;
+}
+
+void pickRandomWords(char out[RANDOM_WORDS][MAX_WORD_LEN]) {
+    int used[WORD_BANK_SIZE] = {0};
+    int count = 0;
+    while(count < RANDOM_WORDS) {
+        int idx = rand() % wordBankCount;
+        if(!used[idx]) {
+            strcpy(out[count], wordBank[idx]);
+            used[idx] = 1;
+            count++;
+        }
+    }
+}
+
+int countOverlap(char set1[RANDOM_WORDS][MAX_WORD_LEN], char set2[RANDOM_WORDS][MAX_WORD_LEN]) {
+    int count = 0, i, j;
+    for(i = 0; i < RANDOM_WORDS; i++) {
+        for(j = 0; j < RANDOM_WORDS; j++) {
+            if(strcmp(set1[i], set2[j]) == 0) {
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+void printWords(char words[RANDOM_WORDS][MAX_WORD_LEN]) {
+    int i;
+    printf("제시된 단어 5개: ");
+    for(i = 0; i < RANDOM_WORDS; i++) {
+        printf("%s ", words[i]);
+    }
+    printf("\n");
+}
+
+void writeRandomSentence() {
+    int retries = 0;
+    char firstSet[RANDOM_WORDS][MAX_WORD_LEN];
+    char secondSet[RANDOM_WORDS][MAX_WORD_LEN];
+    char input[MAX_INPUT_LEN];
+    int validLen = 0;
+
+    pickRandomWords(firstSet);
+    printWords(firstSet);
+
+    while(retries < MAX_RETRIES) {
+        printf("이 단어들이 맘에 들지 않으면 [1], 계속 하려면 [0] 입력: ");
+        int choice;
+        scanf("%d", &choice);
+        getchar();
+        if(choice == 0) {
+            break;
+        }
+        do {
+            pickRandomWords(secondSet);
+        } while(countOverlap(firstSet, secondSet) >= 2);
+        printWords(secondSet);
+        memcpy(firstSet, secondSet, sizeof(firstSet));
+        retries++;
+    }
+
+    while(1) {
+        printf("제시된 5개의 단어를 포함한 90~100자 이내 이야기를 입력하세요:\n");
+        fgets(input, sizeof(input), stdin);
+        int len = strlen(input);
+        if(len > 0 && input[len-1] == '\n') {
+            input[len-1] = '\0';
+            len--;
+        }
+        if(len < 90 || len > 100) {
+            printf("글자 수가 90~100자 사이여야 합니다. 다시 입력하세요.\n");
+            continue;
+        }
+        int foundAll = 1;
+        int i;
+        for(i = 0; i < RANDOM_WORDS; i++) {
+            if(strstr(input, firstSet[i]) == NULL) {
+                foundAll = 0;
+                break;
+            }
+        }
+        if(!foundAll) {
+            printf("모든 제시 단어를 포함해야 합니다. 다시 입력하세요.\n");
+            continue;
+        }
+        break;
+    }
+
+    int usedWordCount = 0, totalChars = 0, repeatedCount = 0;
+    char *token;
+    char inputCopy[MAX_INPUT_LEN];
+    strcpy(inputCopy, input);
+    char *words[100];
+    int wordCount = 0;
+
+    token = strtok(inputCopy, " ");
+    while(token != NULL) {
+        words[wordCount++] = token;
+        token = strtok(NULL, " ");
+    }
+
+    int i, j;
+    for(i = 0; i < wordCount; i++) {
+        int isUsedWord = 0;
+        for(j = 0; j < RANDOM_WORDS; j++) {
+            if(strcmp(words[i], firstSet[j]) == 0) {
+                isUsedWord = 1;
+                repeatedCount++;
+                break;
+            }
+        }
+        if(isUsedWord) usedWordCount++;
+        totalChars += strlen(words[i]);
+    }
+
+    printf("사용된 단어 수: %d\n", usedWordCount);
+    printf("문자 수(공백 제외): %d\n", totalChars);
+    printf("5개 단어 반복 횟수: %d\n", repeatedCount);
+}
