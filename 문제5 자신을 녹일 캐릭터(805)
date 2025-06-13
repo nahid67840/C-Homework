@@ -1,0 +1,234 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define MAX_TYPE_LEN 50
+#define MAX_DESC_LEN 256
+#define MAX_CHAR_TYPES 8
+#define ANALYZED_COUNT 4
+
+typedef struct CharacterType {
+    char type[MAX_TYPE_LEN];
+    char description[MAX_DESC_LEN];
+    int isNegative; // 1 if 악당 or 사이코패스, else 0
+} CharacterType;
+
+typedef struct CharNode {
+    CharacterType character;
+    int ratio;
+    struct CharNode *prev, *next;
+} CharNode;
+
+CharNode *head = NULL;
+
+int loadCharacterTypes(const char *filename, CharacterType arr[], int max) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0;
+    int count = 0;
+    char line[512];
+    while (count < max && fgets(line, sizeof(line), fp)) {
+        char *type = strtok(line, ",");
+        char *desc = strtok(NULL, "\r\n");
+        if (!type || !desc) continue;
+        strncpy(arr[count].type, type, MAX_TYPE_LEN-1);
+        arr[count].type[MAX_TYPE_LEN-1] = '\0';
+        strncpy(arr[count].description, desc, MAX_DESC_LEN-1);
+        arr[count].description[MAX_DESC_LEN-1] = '\0';
+        arr[count].isNegative = (strstr(type, "악당") != NULL || strstr(type, "사이코패스") != NULL) ? 1 : 0;
+        count++;
+    }
+    fclose(fp);
+    return count;
+}
+
+int compareNodes(const void *a, const void *b) {
+    CharNode *nodeA = *(CharNode **)a;
+    CharNode *nodeB = *(CharNode **)b;
+    return nodeB->ratio - nodeA->ratio;
+}
+
+void insertSorted(CharNode *newNode) {
+    if (!head) {
+        head = newNode;
+        newNode->prev = newNode->next = NULL;
+        return;
+    }
+    CharNode *cur = head;
+    while (cur && cur->ratio >= newNode->ratio) cur = cur->next;
+    if (!cur) {
+        // Insert at end
+        CharNode *tail = head;
+        while (tail->next) tail = tail->next;
+        tail->next = newNode;
+        newNode->prev = tail;
+        newNode->next = NULL;
+    } else if (cur == head) {
+        newNode->next = head;
+        newNode->prev = NULL;
+        head->prev = newNode;
+        head = newNode;
+    } else {
+        newNode->next = cur;
+        newNode->prev = cur->prev;
+        cur->prev->next = newNode;
+        cur->prev = newNode;
+    }
+}
+
+void freeList() {
+    CharNode *cur = head;
+    while (cur) {
+        CharNode *tmp = cur;
+        cur = cur->next;
+        free(tmp);
+    }
+    head = NULL;
+}
+
+void printList() {
+    CharNode *cur = head;
+    while (cur) {
+        printf("캐릭터 유형: %s\n비율: %d%%\n설명: %s\n\n", cur->character.type, cur->ratio, cur->character.description);
+        cur = cur->next;
+    }
+}
+
+CharNode *findNegativeNode() {
+    CharNode *cur = head;
+    while (cur) {
+        if (cur->character.isNegative) return cur;
+        cur = cur->next;
+    }
+    return NULL;
+}
+
+void removeNode(CharNode *node) {
+    if (!node) return;
+    if (node == head) head = node->next;
+    if (node->prev) node->prev->next = node->next;
+    if (node->next) node->next->prev = node->prev;
+    free(node);
+}
+
+void studyMyCharacter() {
+    CharacterType allTypes[MAX_CHAR_TYPES];
+    int totalTypes = loadCharacterTypes("character.txt", allTypes, MAX_CHAR_TYPES);
+    if (totalTypes < MAX_CHAR_TYPES) {
+        printf("캐릭터 유형 로드 실패\n");
+        return;
+    }
+    freeList();
+    srand((unsigned)time(NULL));
+    int selectedIndices[ANALYZED_COUNT] = {-1,-1,-1,-1};
+    int negIdx = -1;
+    // Select one negative (악당 or 사이코패스)
+    for (int i=0; i<totalTypes; i++) {
+        if (allTypes[i].isNegative) {
+            negIdx = i;
+            break;
+        }
+    }
+    if (negIdx == -1) {
+        printf("부정적 캐릭터 유형이 존재하지 않습니다.\n");
+        return;
+    }
+    selectedIndices[0] = negIdx;
+    // Select 3 other unique indices excluding negIdx
+    int count = 1;
+    while (count < ANALYZED_COUNT) {
+        int r = rand() % totalTypes;
+        int duplicate = 0;
+        for (int j=0; j<count; j++) {
+            if (selectedIndices[j] == r) {
+                duplicate = 1;
+                break;
+            }
+        }
+        if (!duplicate && !allTypes[r].isNegative) {
+            selectedIndices[count++] = r;
+        }
+    }
+    // Generate random ratios summing to 100
+    int ratios[ANALYZED_COUNT] = {0};
+    int remaining = 100;
+    for (int i=0; i<ANALYZED_COUNT-1; i++) {
+        int r = (rand() % (remaining - (ANALYZED_COUNT - 1 - i))) + 1;
+        ratios[i] = r;
+        remaining -= r;
+    }
+    ratios[ANALYZED_COUNT-1] = remaining;
+
+    // Create nodes
+    CharNode *nodes[ANALYZED_COUNT];
+    for (int i=0; i<ANALYZED_COUNT; i++) {
+        nodes[i] = malloc(sizeof(CharNode));
+        nodes[i]->character = allTypes[selectedIndices[i]];
+        nodes[i]->ratio = ratios[i];
+        nodes[i]->prev = nodes[i]->next = NULL;
+    }
+    // Sort nodes by ratio desc
+    qsort(nodes, ANALYZED_COUNT, sizeof(CharNode*), compareNodes);
+    // Insert to linked list sorted by ratio desc
+    for (int i=0; i<ANALYZED_COUNT; i++) {
+        insertSorted(nodes[i]);
+    }
+
+    printf("분석된 캐릭터 유형 및 비율:\n");
+    printList();
+
+    CharNode *negNode = findNegativeNode();
+    if (negNode) {
+        printf("부정적인 캐릭터 유형 '%s' 제거 중...\n\n", negNode->character.type);
+        removeNode(negNode);
+    }
+
+    printf("부정적인 캐릭터 제거 후 캐릭터 목록:\n");
+    printList();
+
+    // 보너스: 부정적 캐릭터 제거 후 대체 캐릭터 선택
+    if (negNode) {
+        printf("대체할 캐릭터 유형을 선택하세요:\n");
+        for (int i=0; i<totalTypes; i++) {
+            if (!allTypes[i].isNegative) {
+                // Check not already in list
+                int exists = 0;
+                CharNode *cur = head;
+                while (cur) {
+                    if (strcmp(cur->character.type, allTypes[i].type) == 0) {
+                        exists = 1;
+                        break;
+                    }
+                    cur = cur->next;
+                }
+                if (!exists) {
+                    printf("- %s\n", allTypes[i].type);
+                }
+            }
+        }
+        char choice[MAX_TYPE_LEN];
+        printf("선택: ");
+        scanf(" %49[^\n]", choice);
+
+        // Find chosen character
+        int foundIdx = -1;
+        for (int i=0; i<totalTypes; i++) {
+            if (strcmp(allTypes[i].type, choice) == 0 && !allTypes[i].isNegative) {
+                foundIdx = i;
+                break;
+            }
+        }
+        if (foundIdx != -1) {
+            CharNode *newNode = malloc(sizeof(CharNode));
+            newNode->character = allTypes[foundIdx];
+            // Assign ratio = average of removed node ratio or 25 (if no ratio info)
+            newNode->ratio = negNode ? negNode->ratio : 25;
+            newNode->prev = newNode->next = NULL;
+            insertSorted(newNode);
+            printf("대체 후 캐릭터 목록:\n");
+            printList();
+        } else {
+            printf("유효하지 않은 선택입니다.\n");
+        }
+    }
+}
