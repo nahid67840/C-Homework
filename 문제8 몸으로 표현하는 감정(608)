@@ -1,0 +1,169 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <time.h>
+
+#define MAX_EMOTIONS 10
+#define MAX_LENGTH 512
+
+typedef struct {
+    char korean[MAX_LENGTH];
+    char english[MAX_LENGTH];
+} EmotionLabel;
+
+typedef struct {
+    EmotionLabel basic;
+    EmotionLabel similar;
+    char bodyMovement[MAX_LENGTH];
+} EmotionEntry;
+
+typedef struct {
+    EmotionEntry emotions[MAX_EMOTIONS];
+    int count;
+} EmotionData;
+
+typedef struct {
+    EmotionLabel labels[MAX_EMOTIONS * 2];
+    int count;
+} EmotionWords;
+
+void parseYAML(const char *filename, EmotionData *data) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) {
+        printf("파일 열기 실패: %s\n", filename);
+        exit(1);
+    }
+    char line[MAX_LENGTH];
+    EmotionEntry temp;
+    memset(&temp, 0, sizeof(temp));
+    int state = 0;
+    data->count = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        if (strstr(line, "- 기본 감정:")) {
+            if (data->count > 0) {
+                data->emotions[data->count - 1] = temp;
+                memset(&temp, 0, sizeof(temp));
+            }
+            data->count++;
+            state = 0;
+        } else if (strstr(line, "기본 감정:")) {
+            state = 1;
+        } else if (strstr(line, "유사 감정:")) {
+            state = 2;
+        } else if (strstr(line, "몸 동작:")) {
+            state = 3;
+        } else if (strstr(line, "한국어:")) {
+            char *val = strchr(line, ':') + 2;
+            val[strcspn(val, "\n")] = 0;
+            if (state == 1) strncpy(temp.basic.korean, val, MAX_LENGTH-1);
+            else if (state == 2) strncpy(temp.similar.korean, val, MAX_LENGTH-1);
+        } else if (strstr(line, "영어:")) {
+            char *val = strchr(line, ':') + 2;
+            val[strcspn(val, "\n")] = 0;
+            if (state == 1) strncpy(temp.basic.english, val, MAX_LENGTH-1);
+            else if (state == 2) strncpy(temp.similar.english, val, MAX_LENGTH-1);
+        } else if (strstr(line, "표현:")) {
+            char *val = strchr(line, ':') + 2;
+            val[strcspn(val, "\n")] = 0;
+            strncpy(temp.bodyMovement, val, MAX_LENGTH-1);
+        }
+    }
+    if (data->count > 0) {
+        data->emotions[data->count - 1] = temp;
+    }
+    fclose(fp);
+}
+
+void initEmotionWords(EmotionData *data, EmotionWords *words) {
+    words->count = 0;
+    int i;
+    for (i = 0; i < data->count; i++) {
+        if (words->count < MAX_EMOTIONS * 2)
+            words->labels[words->count++] = data->emotions[i].basic;
+        if (words->count < MAX_EMOTIONS * 2)
+            words->labels[words->count++] = data->emotions[i].similar;
+    }
+}
+
+int strcasecmp(const char *s1, const char *s2) {
+    while (*s1 && *s2) {
+        char c1 = tolower((unsigned char)*s1);
+        char c2 = tolower((unsigned char)*s2);
+        if (c1 != c2) return c1 - c2;
+        s1++; s2++;
+    }
+    return tolower((unsigned char)*s1) - tolower((unsigned char)*s2);
+}
+
+void saveEmotionAsJSON(const char *filename, EmotionData *data) {
+    FILE *fp = fopen(filename, "w");
+    if (!fp) {
+        printf("JSON 파일 저장 실패: %s\n", filename);
+        return;
+    }
+    fprintf(fp, "[\n");
+    int i;
+    for (i = 0; i < data->count; i++) {
+        fprintf(fp, "  {\n");
+        fprintf(fp, "    \"기본 감정\": {\n");
+        fprintf(fp, "      \"한국어\": \"%s\",\n", data->emotions[i].basic.korean);
+        fprintf(fp, "      \"영어\": \"%s\"\n", data->emotions[i].basic.english);
+        fprintf(fp, "    },\n");
+        fprintf(fp, "    \"유사 감정\": {\n");
+        fprintf(fp, "      \"한국어\": \"%s\",\n", data->emotions[i].similar.korean);
+        fprintf(fp, "      \"영어\": \"%s\"\n", data->emotions[i].similar.english);
+        fprintf(fp, "    },\n");
+        fprintf(fp, "    \"몸 동작\": {\n");
+        fprintf(fp, "      \"표현\": \"%s\"\n", data->emotions[i].bodyMovement);
+        fprintf(fp, "    }\n");
+        fprintf(fp, "  }%s\n", (i == data->count - 1) ? "" : ",");
+    }
+    fprintf(fp, "]\n");
+    fclose(fp);
+    printf("emotion.json 파일로 저장 완료!\n");
+}
+
+void practiceEmotionWithBody() {
+    EmotionData data;
+    EmotionWords words;
+    char input[MAX_LENGTH];
+    int correctCount = 0;
+    int answered[ MAX_EMOTIONS * 2 ] = {0};
+    int i;
+
+    parseYAML("emotion.yaml", &data);
+    initEmotionWords(&data, &words);
+
+    srand((unsigned int)time(NULL));
+
+    printf("감정 영어 단어 맞추기 퀴즈 시작! (5개 정답 맞히기)\n");
+    while (correctCount < 5) {
+        int idx = rand() % words.count;
+        if (answered[idx]) continue;
+        printf("\n'%s' 감정의 영어 표현을 입력하세요: ", words.labels[idx].korean);
+
+        if (!fgets(input, sizeof(input), stdin)) {
+            printf("입력 오류\n");
+            continue;
+        }
+        input[strcspn(input, "\n")] = 0;
+
+        if (strcasecmp(input, words.labels[idx].english) == 0) {
+            printf("정답!\n");
+            answered[idx] = 1;
+            correctCount++;
+        } else {
+            printf("오답. 정답은: %s\n", words.labels[idx].english);
+        }
+    }
+
+    printf("\n모든 문제 정답! 감정 정보 출력:\n\n");
+    for (i = 0; i < data.count; i++) {
+        printf("기본 감정: %s (%s)\n", data.emotions[i].basic.korean, data.emotions[i].basic.english);
+        printf("유사 감정: %s (%s)\n", data.emotions[i].similar.korean, data.emotions[i].similar.english);
+        printf("몸 동작: %s\n\n", data.emotions[i].bodyMovement);
+    }
+
+    saveEmotionAsJSON("emotion.json", &data);
+}
