@@ -1,0 +1,340 @@
+#include <stdio.h>
+#include <time.h>
+
+#define MAX_MEMBERS 7
+#define MAX_NICK_LEN 20
+#define MAX_NAME_LEN 20
+#define MAX_JOURNEY_LEN 71
+#define MIN_JOURNEY_LEN 30
+#define MAX_MEMORIES 20
+#define DATE_STR_LEN 9
+#define FULL_DATE_STR_LEN 14
+
+typedef struct {
+    char name[MAX_NAME_LEN];
+    char nickname[MAX_NICK_LEN];
+} Member;
+
+typedef struct {
+    char date[DATE_STR_LEN];
+    int wowEffect;
+    char journey[MAX_JOURNEY_LEN];
+} Memory;
+
+typedef struct {
+    char name[MAX_NAME_LEN];
+    Memory memories[MAX_MEMORIES];
+    int memoryCount;
+} TraineeRecord;
+
+static const Member members[MAX_MEMBERS] = {
+    {"김영진", "YoungJin"},
+    {"이지훈", "JiHoon"},
+    {"박찬호", "ChanHo"},
+    {"최수민", "SooMin"},
+    {"이민재", "MinJae"},
+    {"강현우", "HyunWoo"},
+    {"송재현", "JaeHyun"}
+};
+
+static TraineeRecord traineeRecords[MAX_MEMBERS];
+
+static int gCurrentTimeOverride = 0;
+static struct tm gOverrideTime;
+
+int strEqIgnoreCase(char *a, char *b) {
+    while(*a && *b) {
+        char ca = (*a >= 'A' && *a <= 'Z') ? (*a + 32) : *a;
+        char cb = (*b >= 'A' && *b <= 'Z') ? (*b + 32) : *b;
+        if(ca != cb) return 0;
+        a++; b++;
+    }
+    return (*a == 0 && *b == 0);
+}
+
+int strLen(const char *s) {
+    int len = 0;
+    while(*s++) len++;
+    return len;
+}
+
+void strCopy(char *dest, const char *src) {
+    while(*src) *dest++ = *src++;
+    *dest = 0;
+}
+
+int strEq(const char *a, const char *b) {
+    while(*a && *b) {
+        if(*a != *b) return 0;
+        a++; b++;
+    }
+    return (*a == 0 && *b == 0);
+}
+
+int validateDateStr(const char *d) {
+    int i;
+    for(i=0; i<8; i++) {
+        if(d[i] < '0' || d[i] > '9') return 0;
+    }
+    if(d[8] != 0) return 0;
+    return 1;
+}
+
+int validateDateTimeStr(const char *d) {
+    int i;
+    for(i=0; i<10; i++) {
+        if(d[i] < '0' || d[i] > '9') return 0;
+    }
+    if(d[10] != 0) return 0;
+    return 1;
+}
+
+const char* wowEffectName(int val) {
+    if(val >=0 && val <=3) return "Calm";
+    if(val >=4 && val <=6) return "Exciting";
+    return "Meaningful";
+}
+
+int wowEffectValFromName(const char *name) {
+    if(strEqIgnoreCase((char*)name, "Calm")) return 0;
+    if(strEqIgnoreCase((char*)name, "Exciting")) return 4;
+    if(strEqIgnoreCase((char*)name, "Meaningful")) return 7;
+    return -1;
+}
+
+void formatDateFull(const char *src, char *dest) {
+    dest[0] = src[0]; dest[1] = src[1]; dest[2] = src[2]; dest[3] = src[3];
+    dest[4] = '년'; dest[5] = ' ';
+    dest[6] = src[4]; dest[7] = src[5];
+    dest[8] = '월'; dest[9] = ' ';
+    dest[10] = src[6]; dest[11] = src[7];
+    dest[12] = '일'; dest[13] = 0;
+}
+
+struct tm getCurrentLocalTime() {
+    if(gCurrentTimeOverride) return gOverrideTime;
+    time_t t = time(NULL);
+    struct tm tmv = *localtime(&t);
+    return tmv;
+}
+
+int isAllowedTime() {
+    struct tm now = getCurrentLocalTime();
+    int hour = now.tm_hour;
+    return (hour >= 18 && hour <= 22);
+}
+
+int findMemberByNickname(const char *nickname) {
+    int i;
+    for(i=0; i<MAX_MEMBERS; i++) {
+        if(strEq(nickname, members[i].nickname)) return i;
+    }
+    return -1;
+}
+
+void printMembers() {
+    int i;
+    for(i=0; i<MAX_MEMBERS; i++) {
+        printf("%d. %s (%s)\n", i+1, members[i].name, members[i].nickname);
+    }
+}
+
+int inputYesNo(char *prompt) {
+    char buf[10];
+    int tries = 0;
+    while(tries < 2) {
+        printf("%s (y/n): ", prompt);
+        if(fgets(buf, sizeof(buf), stdin) == NULL) return 0;
+        if(buf[0] == 'y' || buf[0] == 'Y') return 1;
+        if(buf[0] == 'n' || buf[0] == 'N') return 0;
+        printf("잘못된 입력입니다. 다시 입력하세요.\n");
+        tries++;
+    }
+    return -1;
+}
+
+void clearStdin() {
+    int c;
+    while((c=getchar()) != '\n' && c != EOF) {}
+}
+
+int inputJourney(char *dest) {
+    char buf[100];
+    while(1) {
+        printf("여정 내용(30자 이상 70자 이하): ");
+        if(fgets(buf, sizeof(buf), stdin) == NULL) return 0;
+        int len=0;
+        char *p=buf;
+        while(*p && *p != '\n') { len++; p++; }
+        if(len < MIN_JOURNEY_LEN) {
+            printf("너무 짧습니다. 30자 이상 입력하세요.\n");
+            continue;
+        }
+        if(len > MAX_JOURNEY_LEN-1) {
+            printf("너무 깁니다. 70자 이하로 입력하세요.\n");
+            continue;
+        }
+        int i;
+        for(i=0; i<len; i++) dest[i] = buf[i];
+        dest[len] = 0;
+        return 1;
+    }
+}
+
+int inputWowEffect() {
+    char buf[10];
+    while(1) {
+        printf("wow effect (0~10): ");
+        if(fgets(buf, sizeof(buf), stdin) == NULL) return -1;
+        int val = 0;
+        int i=0;
+        while(buf[i] >= '0' && buf[i] <= '9') {
+            val = val*10 + (buf[i]-'0');
+            i++;
+        }
+        if(val >=0 && val <=10) return val;
+        printf("0부터 10 사이의 숫자를 입력하세요.\n");
+    }
+}
+
+void createMemory(int idx) {
+    TraineeRecord *rec = &traineeRecords[idx];
+    int yNres = inputYesNo("여정을 기록하시겠습니까?");
+    if(yNres == -1) {
+        printf("입력 실패로 상위 메뉴로 돌아갑니다.\n");
+        return;
+    }
+    if(yNres == 1) {
+        if(rec->memoryCount >= MAX_MEMORIES) {
+            printf("더 이상 기록할 수 없습니다.\n");
+            return;
+        }
+        Memory *m = &rec->memories[rec->memoryCount];
+        struct tm now = getCurrentLocalTime();
+        snprintf(m->date, DATE_STR_LEN, "%04d%02d%02d",
+                 now.tm_year+1900, now.tm_mon+1, now.tm_mday);
+        if(!inputJourney(m->journey)) return;
+        int wow = inputWowEffect();
+        if(wow == -1) return;
+        m->wowEffect = wow;
+        rec->memoryCount++;
+        printf("여정이 기록되었습니다.\n");
+    } else {
+        while(1) {
+            printf("1. 저장한 여정 기록 출력\n");
+            printf("2. 인상 깊은 순간 확인\n");
+            printf("3. 상위 메뉴로 돌아가기\n");
+            printf("선택: ");
+            int sel;
+            if(scanf("%d%*c", &sel) != 1) {
+                printf("잘못된 입력입니다.\n");
+                clearStdin();
+                continue;
+            }
+            if(sel == 1) {
+                displayMemory(idx);
+            } else if(sel == 2) {
+                findImpressiveMoment(idx);
+            } else if(sel == 3) {
+                break;
+            } else {
+                printf("잘못된 선택입니다.\n");
+            }
+        }
+    }
+}
+
+void displayMemory(int idx) {
+    TraineeRecord *rec = &traineeRecords[idx];
+    int i;
+    if(rec->memoryCount == 0) {
+        printf("%s 님(%s)의 기록이 없습니다.\n", rec->name, members[idx].nickname);
+        return;
+    }
+    printf("%s 님(%s)의 여정 기록:\n", rec->name, members[idx].nickname);
+    for(i=0; i<rec->memoryCount; i++) {
+        Memory *m = &rec->memories[i];
+        char fullDate[FULL_DATE_STR_LEN];
+        formatDateFull(m->date, fullDate);
+        printf("%d. %s, WowEffect: %d (%s)\n", i+1, fullDate, m->wowEffect, wowEffectName(m->wowEffect));
+        printf("  %s\n", m->journey);
+    }
+}
+
+void findImpressiveMoment(int idx) {
+    TraineeRecord *rec = &traineeRecords[idx];
+    if(rec->memoryCount == 0) {
+        printf("%s 님(%s)의 기록이 없습니다.\n", rec->name, members[idx].nickname);
+        return;
+    }
+    int maxWow = -1;
+    int maxIdx = -1;
+    int i;
+    for(i=0; i<rec->memoryCount; i++) {
+        if(rec->memories[i].wowEffect > maxWow) {
+            maxWow = rec->memories[i].wowEffect;
+            maxIdx = i;
+        }
+    }
+    if(maxIdx == -1) {
+        printf("인상 깊은 순간을 찾을 수 없습니다.\n");
+        return;
+    }
+    Memory *m = &rec->memories[maxIdx];
+    char fullDate[FULL_DATE_STR_LEN];
+    formatDateFull(m->date, fullDate);
+    printf("가장 인상 깊은 순간:\n");
+    printf("%s, WowEffect: %d (%s)\n", fullDate, m->wowEffect, wowEffectName(m->wowEffect));
+    printf("%s\n", m->journey);
+}
+
+void printMenu() {
+    printf("1. 회원 목록 출력\n");
+    printf("2. 여정 기록 생성 및 조회\n");
+    printf("3. 프로그램 종료\n");
+    printf("선택: ");
+}
+
+int main() {
+    int i;
+    for(i=0; i<MAX_MEMBERS; i++) {
+        strCopy(traineeRecords[i].name, members[i].name);
+        traineeRecords[i].memoryCount = 0;
+    }
+    while(1) {
+        printMenu();
+        int sel;
+        if(scanf("%d%*c", &sel) != 1) {
+            printf("잘못된 입력입니다.\n");
+            clearStdin();
+            continue;
+        }
+        if(sel == 1) {
+            printMembers();
+        } else if(sel == 2) {
+            printf("닉네임 입력: ");
+            char nick[MAX_NICK_LEN];
+            if(fgets(nick, sizeof(nick), stdin) == NULL) {
+                printf("입력 실패\n");
+                continue;
+            }
+            int len = strLen(nick);
+            if(len > 0 && nick[len-1] == '\n') nick[len-1] = 0;
+            int idx = findMemberByNickname(nick);
+            if(idx == -1) {
+                printf("존재하지 않는 닉네임입니다.\n");
+                continue;
+            }
+            if(!isAllowedTime()) {
+                printf("18시부터 22시 사이에만 접근 가능합니다.\n");
+                continue;
+            }
+            createMemory(idx);
+        } else if(sel == 3) {
+            break;
+        } else {
+            printf("잘못된 선택입니다.\n");
+        }
+    }
+    return 0;
+}
