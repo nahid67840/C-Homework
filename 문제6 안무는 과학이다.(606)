@@ -1,0 +1,156 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define MAX_STYLE 100
+#define MAX_LINE 1024
+
+typedef struct {
+    char style[100];
+    char song[100];
+    char description[1024];
+} DanceStyle;
+
+DanceStyle styles[MAX_STYLE];
+int styleCount = 0;
+
+void trimNewline(char *str) {
+    size_t len = strlen(str);
+    if (len > 0 && (str[len - 1] == '\n' || str[len - 1] == '\r')) {
+        str[len - 1] = '\0';
+    }
+}
+
+void parseDanceStyleHTML(const char *filename) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) {
+        printf("파일 열기 실패: %s\n", filename);
+        exit(1);
+    }
+
+    char line[MAX_LINE];
+    int inItem = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        trimNewline(line);
+        if (strstr(line, "<tr>")) {
+            inItem = 1;
+            continue;
+        }
+        if (strstr(line, "</tr>")) {
+            inItem = 0;
+            styleCount++;
+            continue;
+        }
+        if (inItem) {
+            if (strstr(line, "<td>")) {
+                char *start = strstr(line, "<td>") + 4;
+                char *end = strstr(start, "</td>");
+                if (end) *end = '\0';
+
+                if (styles[styleCount].style[0] == '\0')
+                    strncpy(styles[styleCount].style, start, sizeof(styles[styleCount].style));
+                else if (styles[styleCount].song[0] == '\0')
+                    strncpy(styles[styleCount].song, start, sizeof(styles[styleCount].song));
+                else
+                    strncpy(styles[styleCount].description, start, sizeof(styles[styleCount].description));
+            }
+        }
+    }
+
+    fclose(fp);
+}
+
+void shuffleIndexes(int *array, int n) {
+    for (int i = n - 1; i > 0; --i) {
+        int j = rand() % (i + 1);
+        int tmp = array[i];
+        array[i] = array[j];
+        array[j] = tmp;
+    }
+}
+
+void learnDanceStyle() {
+    parseDanceStyleHTML("dance_style.html");
+    printf("안무 스타일 정보를 불러왔습니다. 총 %d개 항목\n", styleCount);
+
+    int indices[MAX_STYLE];
+    for (int i = 0; i < styleCount; ++i)
+        indices[i] = i;
+
+    shuffleIndexes(indices, styleCount);
+    int correct = 0;
+
+    for (int i = 0; i < 5 && i < styleCount; ++i) {
+        int idx = indices[i];
+        printf("\n노래: %s\n", styles[idx].song);
+        printf("아래에서 안무 스타일을 선택하세요:\n");
+        for (int j = 0; j < styleCount; ++j)
+            printf("%d. %s\n", j + 1, styles[j].style);
+        printf("선택 (번호 입력): ");
+        int choice;
+        scanf("%d", &choice);
+        getchar();
+        if (choice < 1 || choice > styleCount) {
+            printf("잘못된 입력입니다.\n");
+            continue;
+        }
+        if (strcmp(styles[idx].style, styles[choice - 1].style) == 0) {
+            printf("정답입니다!\n");
+            correct++;
+        } else {
+            printf("틀렸습니다. 정답은 [%s]입니다.\n", styles[idx].style);
+        }
+    }
+
+    printf("\n총 맞춘 개수: %d/5\n", correct);
+}
+
+void saveDanceStylesToYAML(const char *filename) {
+    FILE *fp = fopen(filename, "w");
+    if (!fp) {
+        printf("YAML 파일 저장 실패\n");
+        return;
+    }
+
+    fprintf(fp, "danceStyles:\n");
+    for (int i = 0; i < styleCount; ++i) {
+        fprintf(fp, "  - 안무_스타일: %s\n", styles[i].style);
+        fprintf(fp, "    노래: %s\n", styles[i].song);
+        fprintf(fp, "    설명: %s\n", styles[i].description);
+    }
+
+    fclose(fp);
+    printf("YAML 파일로 저장 완료: %s\n", filename);
+}
+
+void menu() {
+    int choice;
+    while (1) {
+        printf("\n[안무 스타일 메뉴]\n");
+        printf("1. 안무 스타일 훈련 시작\n");
+        printf("2. 안무 스타일 YAML 파일로 저장\n");
+        printf("0. 종료\n");
+        printf("선택: ");
+        scanf("%d", &choice);
+        getchar();
+        switch (choice) {
+            case 1:
+                learnDanceStyle();
+                break;
+            case 2:
+                saveDanceStylesToYAML("dance_style.yaml");
+                break;
+            case 0:
+                return;
+            default:
+                printf("잘못된 선택입니다.\n");
+        }
+    }
+}
+
+int main() {
+    srand(time(NULL));
+    menu();
+    return 0;
+}
