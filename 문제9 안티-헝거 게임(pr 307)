@@ -1,0 +1,195 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define MAX_MEMBERS 4
+#define MAX_NAME_LEN 20
+#define MAX_NICK_LEN 10
+#define MAX_GIFT_LEN 100
+#define MAX_ENCODED_LEN 200
+
+typedef struct {
+    char name[MAX_NAME_LEN + 1];
+    char nickname[MAX_NICK_LEN + 1];
+} Member;
+
+typedef struct {
+    char senderNick[MAX_NICK_LEN + 1];
+    char gift[MAX_GIFT_LEN + 1];
+    char encoded[MAX_ENCODED_LEN + 1];
+    char receiverNick[MAX_NICK_LEN + 1];
+} ManitoData;
+
+static const char b64chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static Member members[MAX_MEMBERS] = {
+    {"Samuel", "sam"},
+    {"Leonard", "leo"},
+    {"Mia", "mia"},
+    {"Elizabeth", "liz"}
+};
+
+static ManitoData manito;
+
+static int b64char_to_val(char c) {
+    if ('A' <= c && c <= 'Z') return c - 'A';
+    if ('a' <= c && c <= 'z') return c - 'a' + 26;
+    if ('0' <= c && c <= '9') return c - '0' + 52;
+    if (c == '+') return 62;
+    if (c == '/') return 63;
+    return -1;
+}
+
+void base64_encode(const char *input, char *output) {
+    int len = 0;
+    while (input[len]) len++;
+    int i = 0, j = 0;
+    unsigned char a3[3];
+    unsigned char a4[4];
+    while (len--) {
+        a3[i++] = *(input++);
+        if (i == 3) {
+            a4[0] = (a3[0] & 0xfc) >> 2;
+            a4[1] = ((a3[0] & 0x03) << 4) + ((a3[1] & 0xf0) >> 4);
+            a4[2] = ((a3[1] & 0x0f) << 2) + ((a3[2] & 0xc0) >> 6);
+            a4[3] = a3[2] & 0x3f;
+            for (i = 0; i < 4; i++) output[j++] = b64chars[a4[i]];
+            i = 0;
+        }
+    }
+    if (i) {
+        int k;
+        for (k = i; k < 3; k++) a3[k] = 0;
+        a4[0] = (a3[0] & 0xfc) >> 2;
+        a4[1] = ((a3[0] & 0x03) << 4) + ((a3[1] & 0xf0) >> 4);
+        a4[2] = ((a3[1] & 0x0f) << 2) + ((a3[2] & 0xc0) >> 6);
+        a4[3] = a3[2] & 0x3f;
+        for (k = 0; k < i + 1; k++) output[j++] = b64chars[a4[k]];
+        while (i++ < 3) output[j++] = '=';
+    }
+    output[j] = '\0';
+}
+
+void base64_decode(const char *input, char *output) {
+    int len = 0;
+    while (input[len]) len++;
+    int i = 0, j = 0;
+    unsigned char a3[3];
+    unsigned char a4[4];
+    int count = 0;
+    while (len--) {
+        char c = *input++;
+        if (c == '=') break;
+        int val = b64char_to_val(c);
+        if (val == -1) continue;
+        a4[i++] = (unsigned char)val;
+        if (i == 4) {
+            a3[0] = (a4[0] << 2) + ((a4[1] & 0x30) >> 4);
+            a3[1] = ((a4[1] & 0xf) << 4) + ((a4[2] & 0x3c) >> 2);
+            a3[2] = ((a4[2] & 0x3) << 6) + a4[3];
+            for (i = 0; i < 3; i++) output[j++] = a3[i];
+            i = 0;
+        }
+    }
+    if (i) {
+        int k;
+        for (k = i; k < 4; k++) a4[k] = 0;
+        a3[0] = (a4[0] << 2) + ((a4[1] & 0x30) >> 4);
+        a3[1] = ((a4[1] & 0xf) << 4) + ((a4[2] & 0x3c) >> 2);
+        a3[2] = ((a4[2] & 0x3) << 6) + a4[3];
+        for (k = 0; k < i - 1; k++) output[j++] = a3[k];
+    }
+    output[j] = '\0';
+}
+
+int findMemberIndexByNick(const char *nick) {
+    int i;
+    for (i = 0; i < MAX_MEMBERS; i++) {
+        int j = 0;
+        while (nick[j] && nick[j] == members[i].nickname[j]) j++;
+        if (nick[j] == '\0' && members[i].nickname[j] == '\0') return i;
+    }
+    return -1;
+}
+
+int selectRandomReceiver(int senderIndex) {
+    int candidates[MAX_MEMBERS - 1];
+    int count = 0;
+    int i;
+    for (i = 0; i < MAX_MEMBERS; i++) {
+        if (i != senderIndex) candidates[count++] = i;
+    }
+    if (count == 0) return -1;
+    return candidates[rand() % count];
+}
+
+void playManito() {
+    srand((unsigned)time(NULL));
+    printf("마니또 역할 멤버 닉네임 입력: ");
+    char senderNick[MAX_NICK_LEN + 1];
+    scanf("%10s", senderNick);
+    int senderIndex = findMemberIndexByNick(senderNick);
+    if (senderIndex < 0) {
+        printf("멤버를 찾을 수 없습니다.\n");
+        return;
+    }
+    printf("선물을 입력하세요: ");
+    char gift[MAX_GIFT_LEN + 1];
+    getchar();
+    fgets(gift, MAX_GIFT_LEN, stdin);
+    int len = 0;
+    while (gift[len] && gift[len] != '\n') len++;
+    gift[len] = '\0';
+
+    char combined[MAX_NAME_LEN + MAX_GIFT_LEN + 2];
+    int c = 0;
+    int k = 0;
+    while (members[senderIndex].name[k]) combined[c++] = members[senderIndex].name[k++];
+    combined[c++] = ':';
+    k = 0;
+    while (gift[k]) combined[c++] = gift[k++];
+    combined[c] = '\0';
+
+    base64_encode(combined, manito.encoded);
+    int receiverIndex = selectRandomReceiver(senderIndex);
+    if (receiverIndex < 0) {
+        printf("받는 사람이 없습니다.\n");
+        return;
+    }
+    int r = 0;
+    while (members[receiverIndex].nickname[r]) {
+        manito.receiverNick[r] = members[receiverIndex].nickname[r];
+        r++;
+    }
+    manito.receiverNick[r] = '\0';
+
+    int s = 0;
+    while (senderNick[s]) {
+        manito.senderNick[s] = senderNick[s];
+        s++;
+    }
+    manito.senderNick[s] = '\0';
+
+    printf("무작위로 뽑힌 대상 친구 닉네임을 입력하세요: ");
+    char guess[MAX_NICK_LEN + 1];
+    scanf("%10s", guess);
+
+    while (findMemberIndexByNick(guess) != receiverIndex) {
+        printf("틀렸습니다. 다시 시도하세요: ");
+        scanf("%10s", guess);
+    }
+
+    printf("선물과 보낸 사람 정보 인코딩 값: %s\n", manito.encoded);
+    printf("인코딩 값을 입력하세요: ");
+    char inputEncoded[MAX_ENCODED_LEN + 1];
+    getchar();
+    fgets(inputEncoded, MAX_ENCODED_LEN, stdin);
+    len = 0;
+    while (inputEncoded[len] && inputEncoded[len] != '\n') len++;
+    inputEncoded[len] = '\0';
+
+    char decoded[MAX_NAME_LEN + MAX_GIFT_LEN + 2];
+    base64_decode(inputEncoded, decoded);
+    printf("디코딩된 정보: %s\n", decoded);
+}
