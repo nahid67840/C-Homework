@@ -1,0 +1,209 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+#define MAX_TITLE 100
+#define MAX_DESC 500
+#define MAX_HINT 50
+#define MAX_ALBUMS 5
+#define HINT_COUNT 2
+#define FILENAME "world_view.txt"
+
+typedef struct Hint {
+    char word1[MAX_HINT];
+    char word2[MAX_HINT];
+} Hint;
+
+typedef struct WorldView {
+    char title[MAX_TITLE];
+    char description[MAX_DESC];
+    Hint hint;
+    struct WorldView *prev;
+    struct WorldView *next;
+} WorldView;
+
+typedef enum { ASCENDING, DESCENDING } SortOrder;
+
+int readWorldViews(WorldView **list) {
+    FILE *fp = fopen(FILENAME, "r");
+    if (!fp) return 0;
+
+    WorldView *head = NULL, *tail = NULL;
+
+    char line[MAX_TITLE + MAX_DESC + 10];
+    int index = 0;
+
+    while (fgets(line, sizeof(line), fp) && index < MAX_ALBUMS) {
+        WorldView *node = malloc(sizeof(WorldView));
+        if (!node) break;
+
+        char *sep = strchr(line, '|');
+        if (!sep) continue;
+
+        *sep = 0;
+        char *title = line;
+        char *desc = sep + 1;
+
+        desc[strcspn(desc, "\r\n")] = 0;
+
+        strncpy(node->title, title, MAX_TITLE - 1);
+        node->title[MAX_TITLE - 1] = 0;
+        strncpy(node->description, desc, MAX_DESC - 1);
+        node->description[MAX_DESC - 1] = 0;
+
+        node->prev = tail;
+        node->next = NULL;
+        node->hint.word1[0] = 0;
+        node->hint.word2[0] = 0;
+
+        if (!head) head = node;
+        else tail->next = node;
+        tail = node;
+
+        index++;
+    }
+
+    fclose(fp);
+    *list = head;
+    return index;
+}
+
+int containsKeyword(const char *text, const char *keyword) {
+    return strstr(text, keyword) != NULL;
+}
+
+int inputHintWords(const char *desc, const Hint *expectedHint, Hint *inputHint) {
+    int attempts = 0;
+    while (attempts < 2) {
+        printf("다음 앨범의 힌트 단어 2개를 입력하세요 (띄어쓰기로 구분): ");
+        char line[2 * MAX_HINT];
+        if (!fgets(line, sizeof(line), stdin)) return 0;
+
+        sscanf(line, "%s %s", inputHint->word1, inputHint->word2);
+
+        if (!containsKeyword(desc, inputHint->word1) || !containsKeyword(desc, inputHint->word2)) {
+            printf("힌트 단어가 현재 앨범의 세계관 설명에 존재하지 않습니다.\n");
+            attempts++;
+            continue;
+        }
+
+        if ((strcmp(inputHint->word1, expectedHint->word1) == 0 && strcmp(inputHint->word2, expectedHint->word2) == 0) ||
+            (strcmp(inputHint->word1, expectedHint->word2) == 0 && strcmp(inputHint->word2, expectedHint->word1) == 0)) {
+            return 1;
+        } else {
+            printf("힌트 단어가 일치하지 않습니다.\n");
+            attempts++;
+        }
+    }
+    return 0;
+}
+
+void displayAll(WorldView *head) {
+    printf("전체 세계관:\n");
+    WorldView *cur = head;
+    while (cur) {
+        printf("앨범: %s\n세계관: %s\n\n", cur->title, cur->description);
+        cur = cur->next;
+    }
+}
+
+WorldView *sortWorldView(WorldView *head, SortOrder order) {
+    if (!head || !head->next) return head;
+
+    int swapped;
+    WorldView *ptr1;
+    WorldView *lptr = NULL;
+
+    do {
+        swapped = 0;
+        ptr1 = head;
+
+        while (ptr1->next != lptr) {
+            int cmp = strcmp(ptr1->title, ptr1->next->title);
+            if ((order == ASCENDING && cmp > 0) || (order == DESCENDING && cmp < 0)) {
+                WorldView tmp = *ptr1;
+                *ptr1 = *ptr1->next;
+                *ptr1->next = tmp.next;
+                ptr1->prev = tmp.prev;
+                strncpy(ptr1->hint.word1, tmp.hint.word1, MAX_HINT);
+                strncpy(ptr1->hint.word2, tmp.hint.word2, MAX_HINT);
+
+                tmp = *ptr1->next;
+                *ptr1->next = *ptr1;
+                *ptr1 = tmp;
+
+                swapped = 1;
+            }
+            ptr1 = ptr1->next;
+        }
+        lptr = ptr1;
+    } while (swapped);
+
+    return head;
+}
+
+void freeWorldViews(WorldView *head) {
+    while (head) {
+        WorldView *tmp = head;
+        head = head->next;
+        free(tmp);
+    }
+}
+
+void developWorldView() {
+    WorldView *albums = NULL;
+    if (!readWorldViews(&albums)) {
+        printf("세계관 정보를 불러올 수 없습니다.\n");
+        return;
+    }
+
+    const Hint allHints[MAX_ALBUMS - 1] = {
+        {"무한", "시공간"},
+        {"초공간", "인연"},
+        {"코끼리", "스케일"},
+        {"은하수", "히치하킹"}
+    };
+
+    WorldView *cur = albums;
+    int index = 0;
+
+    while (index < MAX_ALBUMS - 1) {
+        printf("현재 앨범: %s\n세계관: %s\n", cur->title, cur->description);
+
+        Hint userHint;
+        if (!inputHintWords(cur->description, &allHints[index], &userHint)) {
+            printf("힌트 입력 실패. 상위 메뉴로 돌아갑니다.\n");
+            freeWorldViews(albums);
+            return;
+        }
+
+        strncpy(cur->hint.word1, userHint.word1, MAX_HINT);
+        strncpy(cur->hint.word2, userHint.word2, MAX_HINT);
+
+        if (!cur->next) break;
+        cur->next->prev = cur;
+        cur = cur->next;
+        index++;
+    }
+
+    displayAll(albums);
+
+    printf("\n[정렬 옵션] 1. 오름차순  2. 내림차순: ");
+    int option;
+    scanf("%d", &option);
+    getchar();
+    SortOrder order = (option == 2) ? DESCENDING : ASCENDING;
+
+    WorldView *sorted = sortWorldView(albums, order);
+
+    printf(order == DESCENDING ? "\n내림차순 연결리스트 출력\n-----------------------\n" : "\n오름차순 연결리스트 출력\n-----------------------\n");
+
+    for (WorldView *cur = sorted; cur; cur = cur->next) {
+        printf("%s", cur->title);
+        if (cur->next) printf(" -> ");
+    }
+    printf("\n");
+
+    freeWorldViews(albums);
+}
