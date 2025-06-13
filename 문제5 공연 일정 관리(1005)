@@ -1,0 +1,435 @@
+// debut.h
+#ifndef DEBUT_H
+#define DEBUT_H
+
+void planSchedule(void);
+
+#endif
+
+// debut.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include "debut.h"
+
+#define MAX_COUNTRY_LEN 50
+#define MAX_REGION_LEN 50
+#define MAX_DATE_LEN 11   // "YYYY-MM-DD"
+#define MAX_TIME_LEN 6    // "HH:MM"
+#define MAX_SONG_LEN 100
+#define MAX_SONGS 20
+#define MAX_PERFORMANCE_NAME_LEN 100
+
+typedef enum {
+    CONCERT_OWN = 1,
+    CONCERT_FOREIGN,
+    CONCERT_DOMESTIC
+} PerformanceType;
+
+typedef struct ExternalStage {
+    char name[MAX_PERFORMANCE_NAME_LEN];
+    struct ExternalStage* next;
+} ExternalStage;
+
+typedef struct Schedule {
+    char country[MAX_COUNTRY_LEN];
+    char region[MAX_REGION_LEN];
+    char date[MAX_DATE_LEN];   // YYYY-MM-DD
+    char time[MAX_TIME_LEN];   // HH:MM
+    int songCount;
+    char songs[MAX_SONGS][MAX_SONG_LEN];
+    char performanceName[MAX_PERFORMANCE_NAME_LEN];
+    struct Schedule* next;
+} Schedule;
+
+static Schedule* scheduleHead = NULL;
+static ExternalStage* foreignStages = NULL;
+static ExternalStage* domesticStages = NULL;
+
+static void toUpperStr(char* s) {
+    while (*s) {
+        *s = (char)toupper(*s);
+        s++;
+    }
+}
+
+static int compareDate(const char* d1, const char* d2) {
+    return strcmp(d1, d2);
+}
+
+static void printSchedule(const Schedule* sc, int printSongs) {
+    printf("공연명: %s\n", sc->performanceName);
+    printf("국가: %s, 지역: %s\n", sc->country, sc->region);
+    printf("날짜: %s, 시간: %s\n", sc->date, sc->time);
+    if (printSongs) {
+        printf("곡 목록:\n");
+        for (int i = 0; i < sc->songCount; i++) {
+            printf(" - %s\n", sc->songs[i]);
+        }
+    }
+    printf("-----------------------\n");
+}
+
+static void addExternalStage(ExternalStage** head, const char* name) {
+    ExternalStage* newNode = (ExternalStage*)malloc(sizeof(ExternalStage));
+    if (!newNode) {
+        printf("메모리 할당 실패\n");
+        exit(EXIT_FAILURE);
+    }
+    strncpy(newNode->name, name, MAX_PERFORMANCE_NAME_LEN - 1);
+    newNode->name[MAX_PERFORMANCE_NAME_LEN - 1] = '\0';
+    newNode->next = *head;
+    *head = newNode;
+}
+
+static void initExternalStages() {
+    // 해외 공식 무대
+    addExternalStage(&foreignStages, "그래미");
+    addExternalStage(&foreignStages, "빌보드");
+    addExternalStage(&foreignStages, "GMA");
+
+    // 국내 공식 무대
+    addExternalStage(&domesticStages, "뮤직 뱅크");
+    addExternalStage(&domesticStages, "인기가요");
+    addExternalStage(&domesticStages, "쇼! 챔피언");
+}
+
+static void freeExternalStages(ExternalStage* head) {
+    while (head) {
+        ExternalStage* tmp = head;
+        head = head->next;
+        free(tmp);
+    }
+}
+
+static void printExternalStages(const ExternalStage* head) {
+    int i = 1;
+    for (; head != NULL; head = head->next, i++) {
+        printf("%d. %s\n", i, head->name);
+    }
+}
+
+static const char* getExternalStageByIndex(ExternalStage* head, int index) {
+    int i = 1;
+    for (; head != NULL; head = head->next, i++) {
+        if (i == index) return head->name;
+    }
+    return NULL;
+}
+
+static void addScheduleNode(Schedule* newNode) {
+    if (!scheduleHead || compareDate(newNode->date, scheduleHead->date) < 0) {
+        newNode->next = scheduleHead;
+        scheduleHead = newNode;
+        return;
+    }
+    Schedule* curr = scheduleHead;
+    while (curr->next && compareDate(newNode->date, curr->next->date) >= 0) {
+        curr = curr->next;
+    }
+    newNode->next = curr->next;
+    curr->next = newNode;
+}
+
+static void addSchedule() {
+    Schedule* newNode = (Schedule*)malloc(sizeof(Schedule));
+    if (!newNode) {
+        printf("메모리 할당 실패\n");
+        return;
+    }
+    newNode->next = NULL;
+
+    printf("공연 국가를 입력하세요: ");
+    scanf(" %49[^\n]", newNode->country);
+
+    printf("공연 지역을 입력하세요: ");
+    scanf(" %49[^\n]", newNode->region);
+
+    printf("공연 날짜를 입력하세요 (YYYY-MM-DD): ");
+    scanf(" %10s", newNode->date);
+
+    printf("공연 시간을 입력하세요 (HH:MM): ");
+    scanf(" %5s", newNode->time);
+
+    printf("곡 목록 수를 입력하세요 (최대 %d): ", MAX_SONGS);
+    if (scanf("%d", &newNode->songCount) != 1 || newNode->songCount < 1 || newNode->songCount > MAX_SONGS) {
+        printf("잘못된 곡 수입니다.\n");
+        free(newNode);
+        return;
+    }
+    getchar();
+    for (int i = 0; i < newNode->songCount; i++) {
+        printf("곡 %d 이름 입력: ", i + 1);
+        fgets(newNode->songs[i], MAX_SONG_LEN, stdin);
+        size_t len = strlen(newNode->songs[i]);
+        if (len > 0 && newNode->songs[i][len - 1] == '\n') newNode->songs[i][len - 1] = '\0';
+    }
+
+    printf("공연 명 입력 방법 선택:\n");
+    printf("1. 자체 콘서트\n");
+    printf("2. 해외 공식 무대\n");
+    printf("3. 국내 공식 무대\n");
+    printf("선택: ");
+    int pType;
+    if (scanf("%d", &pType) != 1 || pType < 1 || pType > 3) {
+        printf("잘못된 선택입니다.\n");
+        free(newNode);
+        return;
+    }
+    getchar();
+
+    if (pType == CONCERT_OWN) {
+        printf("자체 콘서트 공연 명 입력: ");
+        fgets(newNode->performanceName, MAX_PERFORMANCE_NAME_LEN, stdin);
+        size_t len = strlen(newNode->performanceName);
+        if (len > 0 && newNode->performanceName[len - 1] == '\n') newNode->performanceName[len - 1] = '\0';
+    } else {
+        ExternalStage* list = (pType == CONCERT_FOREIGN) ? foreignStages : domesticStages;
+        printf("등록된 공연 목록:\n");
+        printExternalStages(list);
+        printf("선택할 공연 번호 입력: ");
+        int idx;
+        if (scanf("%d", &idx) != 1) {
+            printf("잘못된 입력입니다.\n");
+            free(newNode);
+            return;
+        }
+        const char* selectedStage = getExternalStageByIndex(list, idx);
+        if (!selectedStage) {
+            printf("잘못된 공연 번호입니다.\n");
+            free(newNode);
+            return;
+        }
+        strncpy(newNode->performanceName, selectedStage, MAX_PERFORMANCE_NAME_LEN - 1);
+        newNode->performanceName[MAX_PERFORMANCE_NAME_LEN - 1] = '\0';
+    }
+
+    addScheduleNode(newNode);
+    printf("일정이 추가되었습니다.\n");
+}
+
+static Schedule* findScheduleByDate(const char* date) {
+    Schedule* curr = scheduleHead;
+    while (curr) {
+        if (strcmp(curr->date, date) == 0) return curr;
+        curr = curr->next;
+    }
+    return NULL;
+}
+
+static void searchSchedule() {
+    printf("검색할 날짜 또는 공연 명 입력: ");
+    char input[MAX_PERFORMANCE_NAME_LEN];
+    getchar();
+    fgets(input, sizeof(input), stdin);
+    size_t len = strlen(input);
+    if (len > 0 && input[len - 1] == '\n') input[len - 1] = '\0';
+
+    int found = 0;
+    for (Schedule* curr = scheduleHead; curr; curr = curr->next) {
+        if (strcmp(curr->date, input) == 0 || strstr(curr->performanceName, input) != NULL) {
+            printSchedule(curr, 1);
+            found = 1;
+        }
+    }
+    if (!found) {
+        printf("검색 결과가 없습니다.\n");
+    }
+}
+
+static void modifySchedule() {
+    printf("수정할 일정의 날짜를 입력하세요 (YYYY-MM-DD): ");
+    char date[MAX_DATE_LEN];
+    getchar();
+    fgets(date, sizeof(date), stdin);
+    size_t len = strlen(date);
+    if (len > 0 && date[len - 1] == '\n') date[len - 1] = '\0';
+
+    Schedule* sc = findScheduleByDate(date);
+    if (!sc) {
+        printf("해당 날짜의 일정이 없습니다.\n");
+        return;
+    }
+    printf("수정할 필드를 선택하세요:\n");
+    printf("1. 국가\n2. 지역\n3. 시간\n4. 곡 목록\n5. 공연 명\n선택: ");
+    int choice;
+    if (scanf("%d", &choice) != 1 || choice < 1 || choice > 5) {
+        printf("잘못된 선택입니다.\n");
+        return;
+    }
+    getchar();
+    switch (choice) {
+        case 1:
+            printf("새 국가 입력: ");
+            fgets(sc->country, MAX_COUNTRY_LEN, stdin);
+            len = strlen(sc->country);
+            if (len > 0 && sc->country[len - 1] == '\n') sc->country[len - 1] = '\0';
+            break;
+        case 2:
+            printf("새 지역 입력: ");
+            fgets(sc->region, MAX_REGION_LEN, stdin);
+            len = strlen(sc->region);
+            if (len > 0 && sc->region[len - 1] == '\n') sc->region[len - 1] = '\0';
+            break;
+        case 3:
+            printf("새 시간 입력 (HH:MM): ");
+            fgets(sc->time, MAX_TIME_LEN, stdin);
+            len = strlen(sc->time);
+            if (len > 0 && sc->time[len - 1] == '\n') sc->time[len - 1] = '\0';
+            break;
+        case 4:
+            printf("새 곡 수 입력: ");
+            int c;
+            if (scanf("%d", &c) != 1 || c < 1 || c > MAX_SONGS) {
+                printf("잘못된 곡 수입니다.\n");
+                getchar();
+                return;
+            }
+            sc->songCount = c;
+            getchar();
+            for (int i = 0; i < c; i++) {
+                printf("곡 %d 이름 입력: ", i + 1);
+                fgets(sc->songs[i], MAX_SONG_LEN, stdin);
+                len = strlen(sc->songs[i]);
+                if (len > 0 && sc->songs[i][len - 1] == '\n') sc->songs[i][len - 1] = '\0';
+            }
+            break;
+        case 5:
+            printf("새 공연 명 입력: ");
+            fgets(sc->performanceName, MAX_PERFORMANCE_NAME_LEN, stdin);
+            len = strlen(sc->performanceName);
+            if (len > 0 && sc->performanceName[len - 1] == '\n') sc->performanceName[len - 1] = '\0';
+            break;
+    }
+    printf("수정이 완료되었습니다.\n");
+}
+
+static void deleteSchedule() {
+    printf("삭제할 일정의 날짜를 입력하세요 (YYYY-MM-DD): ");
+    char date[MAX_DATE_LEN];
+    getchar();
+    fgets(date, sizeof(date), stdin);
+    size_t len = strlen(date);
+    if (len > 0 && date[len - 1] == '\n') date[len - 1] = '\0';
+
+    Schedule* curr = scheduleHead;
+    Schedule* prev = NULL;
+    while (curr) {
+        if (strcmp(curr->date, date) == 0) {
+            if (prev) prev->next = curr->next;
+            else scheduleHead = curr->next;
+            free(curr);
+            printf("일정이 삭제되었습니다.\n");
+            return;
+        }
+        prev = curr;
+        curr = curr->next;
+    }
+    printf("해당 날짜의 일정이 없습니다.\n");
+}
+
+static void printSchedulePeriod() {
+    printf("출력할 연도 입력 (YYYY): ");
+    int year;
+    if (scanf("%d", &year) != 1) {
+        printf("잘못된 입력입니다.\n");
+        return;
+    }
+    printf("출력할 월 입력 (1-12): ");
+    int month;
+    if (scanf("%d", &month) != 1 || month < 1 || month > 12) {
+        printf("잘못된 입력입니다.\n");
+        return;
+    }
+    getchar();
+
+    char startDate[11];
+    char endDate[11];
+    snprintf(startDate, sizeof(startDate), "%04d-%02d-01", year, month);
+    // 단순히 월 마지막 날짜를 31로 처리 (간단 구현)
+    snprintf(endDate, sizeof(endDate), "%04d-%02d-31", year, month);
+
+    int printedMonth = 0;
+    int found = 0;
+    for (Schedule* curr = scheduleHead; curr; curr = curr->next) {
+        if (strcmp(curr->date, startDate) >= 0 && strcmp(curr->date, endDate) <= 0) {
+            // 월별 구분 출력
+            if (!printedMonth) {
+                printf("==== %04d년 %02d월 일정 ====\n", year, month);
+                printedMonth = 1;
+            }
+            printSchedule(curr, 1);
+            found = 1;
+        }
+    }
+    if (!found) {
+        printf("해당 기간 내 일정이 없습니다.\n");
+    }
+}
+
+static void saveScheduleToFile() {
+    FILE* fp = fopen("schedule.txt", "w");
+    if (!fp) {
+        printf("파일 열기 실패\n");
+        return;
+    }
+    for (Schedule* curr = scheduleHead; curr; curr = curr->next) {
+        fprintf(fp, "%s|%s|%s|%s|%s|%d\n",
+            curr->country,
+            curr->region,
+            curr->date,
+            curr->time,
+            curr->performanceName,
+            curr->songCount);
+        for (int i = 0; i < curr->songCount; i++) {
+            fprintf(fp, "%s\n", curr->songs[i]);
+        }
+    }
+    fclose(fp);
+    printf("일정이 파일에 저장되었습니다.\n");
+}
+
+void planSchedule(void) {
+    initExternalStages();
+
+    int choice;
+    do {
+        printf("\n[공연 일정 관리]\n");
+        printf("1. 일정 추가\n");
+        printf("2. 일정 검색\n");
+        printf("3. 일정 수정\n");
+        printf("4. 일정 삭제\n");
+        printf("5. 일정 출력 (월 단위)\n");
+        printf("6. 저장 후 상위 메뉴 이동\n");
+        printf("선택: ");
+        if (scanf("%d", &choice) != 1) {
+            printf("잘못된 입력입니다.\n");
+            while (getchar() != '\n'); // 입력 버퍼 비우기
+            continue;
+        }
+
+        switch (choice) {
+            case 1: addSchedule(); break;
+            case 2: searchSchedule(); break;
+            case 3: modifySchedule(); break;
+            case 4: deleteSchedule(); break;
+            case 5: printSchedulePeriod(); break;
+            case 6: saveScheduleToFile(); break;
+            default:
+                printf("잘못된 선택입니다.\n");
+        }
+    } while (choice != 6);
+
+    freeExternalStages(foreignStages);
+    freeExternalStages(domesticStages);
+
+    // 메모리 해제 (일정 리스트)
+    Schedule* curr = scheduleHead;
+    while (curr) {
+        Schedule* tmp = curr;
+        curr = curr->next;
+        free(tmp);
+    }
+    scheduleHead = NULL;
+}
