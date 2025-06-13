@@ -1,0 +1,132 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <assert.h>
+
+#define MAX_FANS 1000
+#define TOTAL_SEATS 42
+#define MAX_ADMIN 10
+#define DRAW_FANS 38
+
+typedef struct SeatNode {
+    int seatNumber;
+    int fanID;
+    struct SeatNode* next;
+} SeatNode;
+
+SeatNode* seatList = NULL;
+
+int adminCount = 4;
+int adminIDs[MAX_ADMIN];
+int drawnFans[DRAW_FANS];
+
+void initAdminIDs(int count) {
+    assert(count >= 1 && count <= MAX_ADMIN);
+    adminCount = count;
+    for (int i = 0; i < adminCount; i++) {
+        adminIDs[i] = 1 + i; // IDs 0001 ~ 0001+adminCount-1
+    }
+}
+
+void shuffleArray(int* arr, int n) {
+    for (int i = n - 1; i > 0; i--) {
+        int j = rand() % (i + 1);
+        int tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+    }
+}
+
+void drawFans() {
+    int pool[MAX_FANS - adminCount];
+    int startID = adminCount + 1; // e.g. 0005 if adminCount=4
+    for (int i = 0; i < MAX_FANS - adminCount; i++) {
+        pool[i] = startID + i;
+    }
+    shuffleArray(pool, MAX_FANS - adminCount);
+    for (int i = 0; i < DRAW_FANS; i++) {
+        drawnFans[i] = pool[i];
+    }
+}
+
+SeatNode* createSeatNode(int seatNum, int fanID) {
+    SeatNode* node = (SeatNode*)malloc(sizeof(SeatNode));
+    assert(node != NULL);
+    node->seatNumber = seatNum;
+    node->fanID = fanID;
+    node->next = NULL;
+    return node;
+}
+
+void assignSeats() {
+    // Create array for seat numbers 5~42 for drawn fans shuffle
+    int seatsForFans[TOTAL_SEATS - adminCount];
+    for (int i = 0; i < TOTAL_SEATS - adminCount; i++) {
+        seatsForFans[i] = adminCount + 1 + i; // seats 5 ~ 42 if adminCount=4
+    }
+    shuffleArray(seatsForFans, TOTAL_SEATS - adminCount);
+
+    // Create linked list: seat 1 ~ adminCount assigned to admins in order
+    for (int i = 0; i < adminCount; i++) {
+        SeatNode* node = createSeatNode(i + 1, adminIDs[i]);
+        node->next = seatList;
+        seatList = node;
+    }
+    // Assign drawn fans seats randomly from 5~42
+    for (int i = 0; i < DRAW_FANS; i++) {
+        SeatNode* node = createSeatNode(seatsForFans[i], drawnFans[i]);
+        node->next = seatList;
+        seatList = node;
+    }
+}
+
+int compareSeat(const void* a, const void* b) {
+    SeatNode* n1 = *(SeatNode**)a;
+    SeatNode* n2 = *(SeatNode**)b;
+    return n1->seatNumber - n2->seatNumber;
+}
+
+void printSeats() {
+    // Collect nodes into array to sort by seatNumber
+    SeatNode* arr[TOTAL_SEATS];
+    int count = 0;
+    SeatNode* cur = seatList;
+    while (cur != NULL) {
+        arr[count++] = cur;
+        cur = cur->next;
+    }
+    qsort(arr, count, sizeof(SeatNode*), compareSeat);
+
+    // Print 6 rows, 7 cols (42 seats)
+    for (int i = 0; i < 6; i++) {
+        for (int j = 0; j < 7; j++) {
+            int idx = i * 7 + j;
+            printf("%02d:%04d ", arr[idx]->seatNumber, arr[idx]->fanID);
+        }
+        printf("\n");
+    }
+}
+
+void freeSeats() {
+    while (seatList != NULL) {
+        SeatNode* tmp = seatList;
+        seatList = seatList->next;
+        free(tmp);
+    }
+}
+
+void openDemoConcert() {
+    printf("운영진 수 입력 (1~10): ");
+    int count;
+    scanf("%d", &count);
+    while (count < 1 || count > MAX_ADMIN) {
+        printf("1부터 10 사이의 숫자를 입력하세요: ");
+        scanf("%d", &count);
+    }
+    initAdminIDs(count);
+    srand((unsigned int)time(NULL));
+    drawFans();
+    assignSeats();
+    printSeats();
+    freeSeats();
+}
